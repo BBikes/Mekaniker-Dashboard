@@ -6,6 +6,7 @@ Minimal internal workshop statistics app for B-Bikes.
 
 - Supabase schema for mechanic item mappings, daily baselines, daily totals, and sync logs
 - Customers 1st ticket-material probe and manual sync
+- Initial 90-day backfill on first successful cron run
 - TV dashboard page
 - Report/export page
 
@@ -13,9 +14,12 @@ Minimal internal workshop statistics app for B-Bikes.
 
 Copy `.env.example` to `.env.local` and fill in:
 
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `C1ST_API_TOKEN`
+- `CRON_SECRET`
 
 Optional:
 
@@ -29,7 +33,7 @@ Optional:
 
 Run the SQL in `supabase/migrations/001_phase1_workshop_stats.sql` against the target Supabase project.
 
-Seed `mechanic_item_mapping` with one row per mechanic item number before syncing.
+Create at least one internal user in Supabase Auth before first login.
 
 ## Run locally
 
@@ -43,17 +47,21 @@ Open:
 - `/` for the internal control page
 - `/dashboard` for the TV dashboard
 - `/reports` for report/export
+- `/settings` for mechanic setup
 
 ## Manual verification flow
 
-1. Seed `mechanic_item_mapping`.
+1. Log in with the Supabase Auth user.
 2. Open `/`.
 3. Run `Probe API` to inspect live Customers 1st normalization.
-4. Run `Seed Today Baseline` once at the start of day.
-5. Run `Sync Now` to pull current ticket-material quantities.
-6. Open `/dashboard`.
+4. Open `/settings` and add the mechanic item mappings.
+5. Run `Opret dagens baseline` once at the start of day.
+6. Run `Kør sync nu` to pull current ticket-material quantities.
+7. Open `/dashboard`.
 
 ## Notes
 
-- Phase 1 is poll-first. There is no automatic 10-minute scheduler or webhook ingestion yet.
+- Automatic 10-minute sync is configured through `vercel.json` and `/api/cron/sync`. It requires `CRON_SECRET` on the production deployment.
+- The cron route creates the initial 90-day backfill once, then continues with daily baseline plus current sync.
+- Manual sync remains available from the control panel.
 - If the Customers 1st contract differs from the documented assumptions, adjust the normalizer in `lib/c1st/normalize-ticket-material.ts`.

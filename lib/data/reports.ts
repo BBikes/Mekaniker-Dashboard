@@ -179,13 +179,27 @@ export async function getDetailedRows(filters: ReportFilters): Promise<DetailedR
   }));
 }
 
+const CSV_DELIMITER = ";";
+const CSV_BOM = "\uFEFF";
+
 function escapeCsvCell(value: string | number | null): string {
-  if (value === null) {
+  if (value === null || value === undefined) {
     return "";
   }
 
-  const stringValue = String(value);
-  if (!stringValue.includes(",") && !stringValue.includes("\"") && !stringValue.includes("\n")) {
+  let stringValue: string;
+  if (typeof value === "number") {
+    stringValue = Number.isFinite(value) ? String(value).replace(".", ",") : "";
+  } else {
+    stringValue = String(value);
+  }
+
+  if (
+    !stringValue.includes(CSV_DELIMITER) &&
+    !stringValue.includes("\"") &&
+    !stringValue.includes("\n") &&
+    !stringValue.includes("\r")
+  ) {
     return stringValue;
   }
 
@@ -195,31 +209,31 @@ function escapeCsvCell(value: string | number | null): string {
 export async function buildCsv(filters: ReportFilters) {
   if (filters.exportMode === "summary") {
     const rows = await getSummaryRows(filters);
-    const header = ["period", "mechanic", "quarters", "hours", "target_hours", "variance_hours"];
+    const header = ["Periode", "Mekaniker", "Kvarterer", "Timer", "Mål (t)", "Difference (t)"];
     const lines = rows.map((row) =>
       [row.period, row.mechanicName, row.quarters, row.hours, row.targetHours, row.varianceHours]
         .map(escapeCsvCell)
-        .join(","),
+        .join(CSV_DELIMITER),
     );
 
-    return [header.join(","), ...lines].join("\n");
+    return CSV_BOM + [header.join(CSV_DELIMITER), ...lines].join("\r\n");
   }
 
   const rows = await getDetailedRows(filters);
   const header = [
-    "date",
-    "mechanic",
-    "ticket_id",
-    "ticket_material_id",
-    "mechanic_item_no",
-    "baseline_quantity",
-    "current_quantity",
-    "today_added_quantity",
-    "hours",
-    "payment_id",
-    "amount_paid",
-    "source_updated_at",
-    "anomaly_code",
+    "Dato",
+    "Mekaniker",
+    "Ticket-ID",
+    "Ticket-linje-ID",
+    "Varenummer",
+    "Baseline",
+    "Aktuel",
+    "Tilføjet i dag",
+    "Timer",
+    "Betalings-ID",
+    "Betalt beløb",
+    "Kilde opdateret",
+    "Anomali",
   ];
   const lines = rows.map((row) =>
     [
@@ -238,8 +252,8 @@ export async function buildCsv(filters: ReportFilters) {
       row.anomalyCode,
     ]
       .map(escapeCsvCell)
-      .join(","),
+      .join(CSV_DELIMITER),
   );
 
-  return [header.join(","), ...lines].join("\n");
+  return CSV_BOM + [header.join(CSV_DELIMITER), ...lines].join("\r\n");
 }

@@ -19,7 +19,7 @@ async function request(url: string, options?: RequestInit) {
 
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? "Request failed");
+    throw new Error(payload.error ?? "Kaldet fejlede");
   }
 
   return payload;
@@ -43,7 +43,7 @@ export function InternalActions() {
     } catch (error) {
       setState({
         label,
-        output: error instanceof Error ? error.message : "Unknown error",
+        output: error instanceof Error ? error.message : "Ukendt fejl",
         error: true,
       });
     } finally {
@@ -55,10 +55,10 @@ export function InternalActions() {
     <section className="panel">
       <div className="panel__header">
         <div>
-          <p className="eyebrow">Manual ops</p>
-          <h2>Probe and sync</h2>
+          <p className="eyebrow">Manuelle handlinger</p>
+          <h2>Probe og sync</h2>
         </div>
-        <p className="muted">Phase 1 stays manual until the live API contract is confirmed.</p>
+        <p className="muted">Brug disse knapper som fallback eller til fejlsøgning af Customers 1st-sync.</p>
       </div>
       <div className="action-row">
         <button
@@ -67,38 +67,38 @@ export function InternalActions() {
           onClick={() => run("Probe API", "/api/sync/probe")}
           type="button"
         >
-          {pendingLabel === "Probe API" ? "Running..." : "Probe API"}
+          {pendingLabel === "Probe API" ? "Kører..." : "Probe API"}
         </button>
         <button
           className="button button--ghost"
           disabled={pendingLabel !== null}
           onClick={() =>
-            run("Seed Today Baseline", "/api/sync/manual", {
+            run("Opret dagens baseline", "/api/sync/manual", {
               method: "POST",
               body: JSON.stringify({ mode: "baseline" }),
             })
           }
           type="button"
         >
-          {pendingLabel === "Seed Today Baseline" ? "Running..." : "Seed Today Baseline"}
+          {pendingLabel === "Opret dagens baseline" ? "Kører..." : "Opret dagens baseline"}
         </button>
         <button
           className="button button--accent"
           disabled={pendingLabel !== null}
           onClick={() =>
-            run("Sync Now", "/api/sync/manual", {
+            run("Kør sync nu", "/api/sync/manual", {
               method: "POST",
               body: JSON.stringify({ mode: "sync" }),
             })
           }
           type="button"
         >
-          {pendingLabel === "Sync Now" ? "Running..." : "Sync Now"}
+          {pendingLabel === "Kør sync nu" ? "Kører..." : "Kør sync nu"}
         </button>
       </div>
       <div className={`response-box ${state?.error ? "response-box--error" : ""}`}>
-        <p className="response-box__label">{state?.label ?? "Response"}</p>
-        <pre>{state?.output ?? "Run a probe or sync action to inspect the result."}</pre>
+        <p className="response-box__label">{state?.label ?? "Svar"}</p>
+        <pre>{state?.output ?? "Kør en handling for at se resultatet her."}</pre>
       </div>
     </section>
   );

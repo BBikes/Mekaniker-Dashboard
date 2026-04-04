@@ -9,6 +9,7 @@ describe("normalizeTicketMaterial", () => {
       taskid: 123,
       title: "Mechanic work",
       amount: 8,
+      date: "2026-04-04",
       paymentid: 77,
       amountpaid: "12.50",
       updated_at: "2026-04-04T08:20:00Z",
@@ -22,6 +23,7 @@ describe("normalizeTicketMaterial", () => {
       ticketId: 123,
       productNo: "MEK-ALICE",
       amount: 8,
+      sourceDate: "2026-04-04",
       paymentId: 77,
       amountPaid: 12.5,
     });

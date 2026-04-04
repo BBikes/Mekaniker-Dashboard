@@ -4,6 +4,7 @@ export type NormalizedTicketMaterial = {
   productNo: string | null;
   title: string | null;
   amount: number;
+  sourceDate: string | null;
   updatedAt: string | null;
   paymentId: number | null;
   amountPaid: number | null;
@@ -78,6 +79,16 @@ function toStringValue(value: unknown): string | null {
   return null;
 }
 
+function toDateString(value: unknown): string | null {
+  const stringValue = toStringValue(value);
+  if (!stringValue) {
+    return null;
+  }
+
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(stringValue);
+  return match ? match[1] : null;
+}
+
 export function normalizeTicketMaterial(raw: unknown): NormalizedTicketMaterial | null {
   const record = asRecord(raw);
   if (!record) {
@@ -111,6 +122,9 @@ export function normalizeTicketMaterial(raw: unknown): NormalizedTicketMaterial 
       ]),
     ),
     title: toStringValue(firstValue(record, [["title"], ["product", "title"], ["product", "name"]])),
+    sourceDate: toDateString(
+      firstValue(record, [["date"], ["created_at"], ["createdAt"], ["task", "date"], ["ticket", "date"]]),
+    ),
     updatedAt: toStringValue(
       firstValue(record, [["updated_at"], ["updatedAt"], ["lastupdated"], ["last_updated"]]),
     ),

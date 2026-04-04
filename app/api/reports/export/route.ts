@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { buildCsv, type ExportMode, type PeriodMode } from "@/lib/data/reports";
+import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,11 @@ function readParam(searchParams: URLSearchParams, key: string, fallback: string)
 }
 
 export async function GET(request: NextRequest) {
+  const user = await getCurrentUserOrNull();
+  if (!user) {
+    return createUnauthorizedApiResponse();
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const fromDate = readParam(searchParams, "fromDate", "");
   const toDate = readParam(searchParams, "toDate", "");

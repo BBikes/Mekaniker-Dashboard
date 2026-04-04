@@ -25,7 +25,7 @@ export function getOptionalEnv(name: string, fallback?: string): string | undefi
 
 export function getServerConfig() {
   return {
-    appTitle: getOptionalEnv("NEXT_PUBLIC_APP_TITLE", "B-Bikes Workshop Stats")!,
+    appTitle: getOptionalEnv("NEXT_PUBLIC_APP_TITLE", "B-Bikes Mekaniker Dashboard")!,
     supabaseUrl: getRequiredEnv("SUPABASE_URL"),
     supabaseServiceRoleKey: getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
     c1stApiToken: getRequiredEnv("C1ST_API_TOKEN"),
@@ -37,10 +37,25 @@ export function getServerConfig() {
   };
 }
 
+export function getPublicSupabaseConfig() {
+  const url = readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("SUPABASE_URL");
+  const anonKey = readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Missing public Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
+
+  return { url, anonKey };
+}
+
 export function getEnvPresence() {
   return {
-    supabaseUrl: Boolean(readEnv("SUPABASE_URL")),
+    supabaseUrl: Boolean(readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("SUPABASE_URL")),
     supabaseServiceRoleKey: Boolean(readEnv("SUPABASE_SERVICE_ROLE_KEY")),
+    supabaseAnonKey: Boolean(readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")),
     c1stApiToken: Boolean(readEnv("C1ST_API_TOKEN")),
+    cronSecret: Boolean(readEnv("CRON_SECRET")),
   };
 }

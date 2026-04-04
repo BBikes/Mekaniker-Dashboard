@@ -413,6 +413,254 @@ tr:last-child td {
   font-weight: 700;
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  padding: 32px 28px;
+  border-radius: 24px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 14px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.login-form__error {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.login-form__submit {
+  justify-self: stretch;
+  width: 100%;
+  padding: 14px 18px;
+}
+
+.app-header {
+  width: min(1180px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding: 24px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.app-header__nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.app-header__nav a {
+  color: var(--muted);
+  font-weight: 600;
+  padding: 6px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.app-header__nav a.is-active {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent);
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-header__link {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.logout-button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.logout-button:hover {
+  border-color: rgba(15, 118, 110, 0.5);
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip:hover {
+  border-color: rgba(15, 118, 110, 0.5);
+}
+
+.chip.is-active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.settings-panel {
+  margin-bottom: 24px;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-table th,
+.settings-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.settings-table input[type="text"],
+.settings-table input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+}
+
+.settings-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-table .row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: end;
+}
+
+.icon-button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.icon-button--danger {
+  color: var(--error);
+  border-color: rgba(180, 35, 24, 0.3);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.flash {
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.flash--success {
+  background: rgba(16, 185, 129, 0.14);
+  color: #0f5132;
+}
+
+.flash--error {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--error);
+}
+
+.dashboard-header h1 {
+  font-size: clamp(2.5rem, 5vw, 3.75rem);
+}
+
+.bar-value {
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+}
+
+.bar-label {
+  font-size: clamp(1.15rem, 1.8vw, 1.6rem);
+}
+
 @media (max-width: 900px) {
   .dashboard-card {
     min-height: auto;

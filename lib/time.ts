@@ -7,16 +7,47 @@ const dateFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
+const longDateFormatter = new Intl.DateTimeFormat("da-DK", {
   timeZone: TIME_ZONE,
-  weekday: "short",
-  day: "2-digit",
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+const shortDateFormatter = new Intl.DateTimeFormat("da-DK", {
+  timeZone: TIME_ZONE,
+  day: "numeric",
   month: "short",
   year: "numeric",
 });
 
+const hoursFormatter = new Intl.NumberFormat("da-DK", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 2,
+});
+
+const integerFormatter = new Intl.NumberFormat("da-DK", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const decimalFormatter = new Intl.NumberFormat("da-DK", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const timeFormatter = new Intl.DateTimeFormat("da-DK", {
   timeZone: TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const dateTimeFormatter = new Intl.DateTimeFormat("da-DK", {
+  timeZone: TIME_ZONE,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
 });
@@ -30,16 +61,41 @@ export function formatCopenhagenDate(date: string | Date): string {
   return longDateFormatter.format(value);
 }
 
+export function formatShortCopenhagenDate(date: string | Date): string {
+  const value = typeof date === "string" ? new Date(`${date}T12:00:00Z`) : date;
+  return shortDateFormatter.format(value);
+}
+
 export function formatCopenhagenTime(date: string | Date | null | undefined): string {
   if (!date) {
-    return "N/A";
+    return "ikke tilgængelig";
   }
 
   return timeFormatter.format(typeof date === "string" ? new Date(date) : date);
 }
 
+export function formatCopenhagenDateTime(date: string | Date | null | undefined): string {
+  if (!date) {
+    return "ikke tilgængelig";
+  }
+
+  return dateTimeFormatter.format(typeof date === "string" ? new Date(date) : date);
+}
+
 export function formatHours(hours: number): string {
-  return `${hours.toFixed(2)} h`;
+  return `${hoursFormatter.format(hours)} t`;
+}
+
+export function formatDecimal(value: number): string {
+  return decimalFormatter.format(value);
+}
+
+export function formatInteger(value: number): string {
+  return integerFormatter.format(value);
+}
+
+export function formatPercent(ratio: number): string {
+  return `${Math.round(ratio * 100)}%`;
 }
 
 export function getWeekKey(dateString: string): string {
@@ -53,10 +109,10 @@ export function getWeekKey(dateString: string): string {
   return `${date.getUTCFullYear()}-W${String(weekNumber).padStart(2, "0")}`;
 }
 
-export function getMonthKey(dateString: string): string {
+export function getMonthKey(dateString: string) {
   return dateString.slice(0, 7);
 }
 
-export function toIsoTimestamp(date = new Date()): string {
+export function toIsoTimestamp(date = new Date()) {
   return date.toISOString();
 }
