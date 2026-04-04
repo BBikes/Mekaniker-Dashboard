@@ -143,6 +143,10 @@ export function toOperatorErrorMessage(error: unknown, fallback = "Ukendt fejl."
     return "Customers 1st-endpoint blev ikke fundet. Brug api.c1st.com/api som base URL, ikke BikeDesk-webdomænet.";
   }
 
+  if (message.includes("Customers 1st request failed with 429")) {
+    return "Customers 1st API afviste kaldet pa grund af rate limit. Prov igen om et ojeblik.";
+  }
+
   if (message.includes("Customers 1st request failed with 500")) {
     return "Customers 1st API svarede 500. Forbindelsen virker, men upstream fejlede under kaldet.";
   }

@@ -33,6 +33,7 @@ type PaginatedResult<T> = {
 
 export type TicketsPage = PaginatedResult<NormalizedTicket>;
 export type TicketMaterialsPage = PaginatedResult<NormalizedTicketMaterial>;
+const MAX_RETRY_ATTEMPTS = 3;
 
 function parseExtraQuery(rawValue: string): URLSearchParams {
   const params = new URLSearchParams();
@@ -129,6 +130,22 @@ function normalizeTicket(raw: Record<string, unknown>): NormalizedTicket | null 
   };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readRetryDelayMs(response: Response, attempt: number) {
+  const retryAfterHeader = response.headers.get("retry-after");
+  if (retryAfterHeader) {
+    const seconds = Number.parseInt(retryAfterHeader, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1000;
+    }
+  }
+
+  return attempt * 1000;
+}
+
 export class CustomersFirstClient {
   private readonly config = getServerConfig();
 
@@ -152,16 +169,29 @@ export class CustomersFirstClient {
     searchParams.set("paginationPageLength", String(paginationPageLength));
     url.search = searchParams.toString();
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${this.config.c1stApiToken}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
+    let response: Response | null = null;
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.config.c1stApiToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
 
-    if (!response.ok) {
-      throw new Error(`Customers 1st request failed with ${response.status} ${response.statusText}`);
+      if (response.ok) {
+        break;
+      }
+
+      if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
+        throw new Error(`Customers 1st request failed with ${response.status} ${response.statusText}`);
+      }
+
+      await sleep(readRetryDelayMs(response, attempt));
+    }
+
+    if (!response || !response.ok) {
+      throw new Error("Customers 1st request failed without a valid response.");
     }
 
     const payload = (await response.json()) as unknown;

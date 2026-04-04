@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   aggregateScheduledMetrics,
   completeScheduledSyncRun,
-  ensureHistoricalBackfill,
   runPhaseOneSync,
   startScheduledSyncRun,
 } from "@/lib/sync/run-phase-one-sync";
@@ -31,17 +30,15 @@ async function handleScheduledSync(request: NextRequest) {
   }
 
   try {
-    const backfill = await ensureHistoricalBackfill();
     const baseline = await runPhaseOneSync("baseline");
     const sync = await runPhaseOneSync("sync");
-    const metrics = aggregateScheduledMetrics([backfill, baseline, sync]);
+    const metrics = aggregateScheduledMetrics([baseline, sync]);
 
     await completeScheduledSyncRun(scheduledRun.syncLogId, {
       status: "completed",
       message: "scheduled sync completed",
       metrics,
       details: {
-        backfillSyncLogId: backfill?.syncLogId ?? null,
         baselineSyncLogId: baseline.syncLogId,
         syncSyncLogId: sync.syncLogId,
       },
@@ -51,7 +48,6 @@ async function handleScheduledSync(request: NextRequest) {
       ok: true,
       skipped: false,
       scheduledSyncLogId: scheduledRun.syncLogId,
-      backfill,
       baseline,
       sync,
     });

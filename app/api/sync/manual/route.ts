@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { toOperatorErrorMessage } from "@/lib/env";
-import { ensureHistoricalBackfill, runPhaseOneSync, type SyncMode } from "@/lib/sync/run-phase-one-sync";
+import { runPhaseOneSync, type SyncMode } from "@/lib/sync/run-phase-one-sync";
 import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
@@ -19,13 +19,9 @@ export async function POST(request: NextRequest) {
   try {
     const payload = (await request.json()) as RequestPayload;
     const mode: SyncMode = payload.mode === "baseline" ? "baseline" : "sync";
-    const backfill = mode === "sync" ? await ensureHistoricalBackfill() : null;
     const result = await runPhaseOneSync(mode);
 
-    return NextResponse.json({
-      backfill,
-      result,
-    });
+    return NextResponse.json({ result });
   } catch (error) {
     return NextResponse.json(
       {

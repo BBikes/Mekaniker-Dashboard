@@ -28,7 +28,7 @@ export async function getDashboardData() {
       supabase
         .from("sync_event_log")
         .select("finished_at, status, sync_type, message")
-        .in("sync_type", ["baseline", "sync", "backfill"])
+        .in("sync_type", ["baseline", "sync"])
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),

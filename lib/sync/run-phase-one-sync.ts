@@ -5,7 +5,6 @@ import type { NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-mater
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
-const BACKFILL_DAYS = 90;
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
 
 type MechanicMapping = {
@@ -32,7 +31,7 @@ type DailyBaselineRow = {
 };
 
 export type SyncMode = "baseline" | "sync";
-type MaterialSyncLogType = SyncMode | "backfill";
+type MaterialSyncLogType = SyncMode;
 type SyncLogType = MaterialSyncLogType | "scheduled";
 
 export type SyncResult = {
@@ -220,7 +219,7 @@ export async function startScheduledSyncRun(lockWindowMinutes = SCHEDULED_SYNC_L
     .from("sync_event_log")
     .select("id, sync_type, started_at")
     .eq("status", "running")
-    .in("sync_type", ["scheduled", "backfill", "baseline", "sync"])
+    .in("sync_type", ["scheduled", "baseline", "sync"])
     .gte("started_at", threshold)
     .order("started_at", { ascending: false })
     .limit(1)
@@ -314,24 +313,6 @@ async function loadRowsForDate(statDate: string) {
   }
 
   return (data ?? []) as DailyBaselineRow[];
-}
-
-async function loadExistingHistoricalKeys(fromDate: string, toDate: string) {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("daily_ticket_item_baselines")
-    .select("stat_date, ticket_material_id")
-    .gte("stat_date", fromDate)
-    .lte("stat_date", toDate);
-
-  if (error) {
-    throw new Error(`Failed to load historical rows: ${error.message}`);
-  }
-
-  return (data ?? []).map((row) => ({
-    statDate: row.stat_date as string,
-    ticketMaterialId: Number(row.ticket_material_id),
-  }));
 }
 
 async function loadPreviousRowsByMaterialId(statDate: string, ticketMaterialIds: number[]) {
@@ -471,23 +452,6 @@ async function getLastSuccessfulSyncTimestamp() {
   return (data?.finished_at as string | undefined) ?? atStartOfDay(getCopenhagenDateString());
 }
 
-async function hasCompletedBackfill() {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("sync_event_log")
-    .select("id")
-    .eq("sync_type", "backfill")
-    .eq("status", "completed")
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Failed to inspect backfill state: ${error.message}`);
-  }
-
-  return Boolean(data);
-}
-
 export async function probeCustomersFirstTicketMaterials() {
   const client = new CustomersFirstClient();
   const updatedAfter = atStartOfDay(getCopenhagenDateString());
@@ -519,147 +483,6 @@ export async function probeCustomersFirstTicketMaterials() {
   };
 }
 
-export async function runHistoricalBackfill(days = BACKFILL_DAYS): Promise<SyncResult> {
-  const syncLogId = await createSyncLog("backfill");
-
-  try {
-    const untilDate = getCopenhagenDateString();
-    const fromDate = dateDaysAgo(days - 1);
-    const updatedAfter = atStartOfDay(fromDate);
-    const [mappings, existingRows] = await Promise.all([fetchActiveMappings(), loadExistingHistoricalKeys(fromDate, untilDate)]);
-    const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
-    const existingKeys = new Set(existingRows.map((row) => `${row.statDate}:${row.ticketMaterialId}`));
-    const client = new CustomersFirstClient();
-    const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
-    const ticketDateById = new Map(
-      updatedTickets.normalizedItems.map((ticket) => [
-        ticket.ticketId,
-        ticket.updatedAt?.slice(0, 10) ?? ticket.createdAt?.slice(0, 10) ?? null,
-      ]),
-    );
-    const ticketMaterials = await fetchTicketScopedMaterials(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
-    const now = toIsoTimestamp();
-    const unmappedProductNos = new Set<string>();
-    const affectedByDate = new Map<string, Set<string>>();
-    let missingProductNoCount = 0;
-    let mappedMaterialsSeen = 0;
-
-    const upserts = [...ticketMaterials.materialsByTicketId.entries()].flatMap(([ticketId, materials]) => materials.flatMap((material) => {
-      const statDate = resolveMaterialStatDate(material, ticketDateById.get(ticketId));
-      if (!statDate || statDate < fromDate || statDate > untilDate) {
-        return [];
-      }
-
-      const productNo = material.productNo?.trim() ?? null;
-      if (!productNo) {
-        missingProductNoCount += 1;
-        return [];
-      }
-
-      const mapping = mappingByItemNo.get(productNo);
-      if (!mapping) {
-        unmappedProductNos.add(productNo);
-        return [];
-      }
-
-      mappedMaterialsSeen += 1;
-      const rowKey = `${statDate}:${material.ticketMaterialId}`;
-      if (existingKeys.has(rowKey)) {
-        return [];
-      }
-
-      if (!affectedByDate.has(statDate)) {
-        affectedByDate.set(statDate, new Set());
-      }
-      affectedByDate.get(statDate)!.add(mapping.id);
-
-      return [
-        {
-          stat_date: statDate,
-          ticket_material_id: material.ticketMaterialId,
-          ticket_id: material.ticketId,
-          mechanic_id: mapping.id,
-          mechanic_item_no: mapping.mechanic_item_no,
-          baseline_quantity: 0,
-          current_quantity: roundNumber(material.amount),
-          today_added_quantity: roundNumber(material.amount),
-          today_added_hours: roundNumber(material.amount * 0.25),
-          source_updated_at: material.updatedAt,
-          source_payment_id: material.paymentId,
-          source_amountpaid: material.amountPaid,
-          last_seen_at: now,
-          anomaly_code: "historical_backfill_estimate",
-          updated_at: now,
-        },
-      ];
-    }));
-
-    if (upserts.length > 0) {
-      const supabase = createAdminClient();
-      const { error } = await supabase.from("daily_ticket_item_baselines").upsert(upserts, {
-        onConflict: "stat_date,ticket_material_id",
-      });
-
-      if (error) {
-        throw new Error(`Failed to write historical backfill rows: ${error.message}`);
-      }
-    }
-
-    for (const [statDate, mechanicIds] of affectedByDate.entries()) {
-      await recalculateTotals(statDate, [...mechanicIds]);
-    }
-
-    const result: SyncResult = {
-      syncLogId,
-      mode: "backfill",
-      statDate: untilDate,
-      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls,
-      materialsSeen: ticketMaterials.materialsSeen,
-      mappedMaterialsSeen,
-      rowsUpserted: upserts.length,
-      rowsCorrected: 0,
-      anomalyCount: upserts.length,
-      details: {
-        unmappedProductNos: [...unmappedProductNos].sort(),
-        missingProductNoCount,
-        affectedMechanicIds: [...new Set([...affectedByDate.values()].flatMap((entry) => [...entry]))],
-        visibilityAnomalies: [],
-      },
-    };
-
-    await completeSyncLog(syncLogId, {
-      status: "completed",
-      http_calls: result.httpCalls,
-      tickets_seen: updatedTickets.normalizedItems.length,
-      materials_seen: result.materialsSeen,
-      rows_upserted: result.rowsUpserted,
-      rows_corrected: result.rowsCorrected,
-      anomaly_count: result.anomalyCount,
-      message: `historical backfill completed for last ${days} days`,
-      details_json: {
-        ...result.details,
-        updatedAfter,
-      },
-    });
-
-    return result;
-  } catch (error) {
-    await completeSyncLog(syncLogId, {
-      status: "failed",
-      message: error instanceof Error ? error.message : "Unknown backfill failure",
-      details_json: {},
-    });
-    throw error;
-  }
-}
-
-export async function ensureHistoricalBackfill(days = BACKFILL_DAYS) {
-  if (await hasCompletedBackfill()) {
-    return null;
-  }
-
-  return runHistoricalBackfill(days);
-}
 
 export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
   const syncLogId = await createSyncLog(mode);
