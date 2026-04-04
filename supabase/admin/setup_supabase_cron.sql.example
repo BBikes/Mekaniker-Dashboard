@@ -1,0 +1,43 @@
+-- B-Bikes workshop scheduler setup for Supabase Cron
+--
+-- Run this manually in the Supabase SQL editor after deployment.
+-- Before running:
+-- 1. Enable the `pg_cron`, `pg_net`, and `vault` extensions in Supabase.
+-- 2. Replace the placeholder values below with your deployed app URL and CRON_SECRET.
+-- 3. If the secret names already exist, update them in the Vault UI instead of re-running create_secret().
+
+select vault.create_secret(
+  'https://your-app.example.com',
+  'bbikes_app_url',
+  'Public base URL for the deployed B-Bikes workshop app'
+);
+
+select vault.create_secret(
+  'replace-with-your-cron-secret',
+  'bbikes_cron_secret',
+  'Authorization secret used by Supabase Cron to call /api/cron/sync'
+);
+
+select cron.schedule(
+  'bbikes-workshop-sync',
+  '*/10 * * * *',
+  $$
+  select
+    net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'bbikes_app_url') || '/api/cron/sync',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'bbikes_cron_secret')
+      ),
+      body := jsonb_build_object(
+        'source', 'supabase-cron',
+        'scheduled_at', now()
+      ),
+      timeout_milliseconds := 10000
+    ) as request_id;
+  $$
+);
+
+-- Useful inspection queries:
+-- select jobid, jobname, schedule, command from cron.job order by jobid desc;
+-- select * from cron.job_run_details order by start_time desc limit 20;

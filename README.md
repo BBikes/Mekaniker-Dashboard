@@ -1,18 +1,19 @@
 # B-Bikes Workshop Statistics
 
-Minimal internal workshop statistics app for B-Bikes.
+Minimal intern workshop-statistik app til B-Bikes.
 
-## Scope in this phase
+## Scope i denne fase
 
-- Supabase schema for mechanic item mappings, daily baselines, daily totals, and sync logs
-- Customers 1st ticket-material probe and manual sync
-- Initial 90-day backfill on first successful cron run
-- TV dashboard page
-- Report/export page
+- Supabase schema for mechanic item mappings, daily baselines, daily totals og sync logs
+- Customers 1st ticket-material probe og manuel sync
+- Initial 90-dages backfill ved første vellykkede automatiske sync
+- TV-dashboard side
+- Rapport/export side
+- Automatisk sync via Supabase Cron
 
 ## Environment
 
-Copy `.env.example` to `.env.local` and fill in:
+Kopiér `.env.example` til `.env.local` og udfyld:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -21,7 +22,7 @@ Copy `.env.example` to `.env.local` and fill in:
 - `C1ST_API_TOKEN`
 - `CRON_SECRET`
 
-Optional:
+Valgfrit:
 
 - `C1ST_API_BASE_URL`
 - `C1ST_DEFAULT_PAGE_LENGTH`
@@ -31,37 +32,38 @@ Optional:
 
 ## Supabase setup
 
-Run the SQL in `supabase/migrations/001_phase1_workshop_stats.sql` against the target Supabase project.
+1. Kør SQL-filen `supabase/migrations/001_phase1_workshop_stats.sql` mod det rigtige Supabase-projekt.
+2. Opret mindst én intern bruger i Supabase Auth før første login.
+3. Aktivér `pg_cron`, `pg_net` og `vault` i Supabase.
+4. Kør SQL-template i `supabase/admin/setup_supabase_cron.sql.example` efter du har indsat rigtig app-URL og `CRON_SECRET`.
 
-Create at least one internal user in Supabase Auth before first login.
-
-## Run locally
+## Kør lokalt
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open:
+Åbn:
 
-- `/` for the internal control page
-- `/dashboard` for the TV dashboard
-- `/reports` for report/export
-- `/settings` for mechanic setup
+- `/` for internt kontrolpanel
+- `/dashboard` for TV-dashboard
+- `/reports` for rapport/export
+- `/settings` for mekaniker-opsætning
 
-## Manual verification flow
+## Manuel verificering
 
-1. Log in with the Supabase Auth user.
-2. Open `/`.
-3. Run `Probe API` to inspect live Customers 1st normalization.
-4. Open `/settings` and add the mechanic item mappings.
-5. Run `Opret dagens baseline` once at the start of day.
-6. Run `Kør sync nu` to pull current ticket-material quantities.
-7. Open `/dashboard`.
+1. Log ind med Supabase Auth-brugeren.
+2. Åbn `/`.
+3. Kør `Probe API` for at se live Customers 1st-normalisering.
+4. Åbn `/settings` og opret mekaniker-mappings.
+5. Kør `Opret dagens baseline` én gang ved dagens start hvis du vil teste manuelt.
+6. Kør `Kør sync nu` for at hente aktuelle ticket-material mængder.
+7. Åbn `/dashboard`.
 
-## Notes
+## Noter
 
-- Automatic 10-minute sync is configured through `vercel.json` and `/api/cron/sync`. It requires `CRON_SECRET` on the production deployment.
-- The cron route creates the initial 90-day backfill once, then continues with daily baseline plus current sync.
-- Manual sync remains available from the control panel.
-- If the Customers 1st contract differs from the documented assumptions, adjust the normalizer in `lib/c1st/normalize-ticket-material.ts`.
+- Automatisk 10-minutters sync kører via Supabase Cron og kalder `/api/cron/sync` med `CRON_SECRET`.
+- Scheduled route laver første 90-dages backfill én gang og fortsætter derefter med baseline plus normal sync.
+- Manuel sync er stadig tilgængelig fra kontrolpanelet.
+- Hvis Customers 1st-kontrakten afviger fra antagelserne, justér normalizeren i `lib/c1st/normalize-ticket-material.ts`.

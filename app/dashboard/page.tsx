@@ -62,7 +62,7 @@ export default async function DashboardPage() {
           </div>
           <div className="dashboard-meta">
             <p>{todayLabel}</p>
-            <p className="muted">Opdateres hvert 10. min · Sidst opdateret {lastUpdatedLabel}</p>
+            <p className="muted">Opdateres automatisk hvert 10. minut · Sidst opdateret {lastUpdatedLabel}</p>
           </div>
         </header>
 

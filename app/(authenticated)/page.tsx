@@ -130,6 +130,9 @@ export default async function HomePage() {
                 </span>
               </div>
             </div>
+            <p className="muted" style={{ marginTop: 16 }}>
+              Automatisk sync kører via Supabase Cron hvert 10. minut.
+            </p>
           </section>
 
           <section className="panel panel--link">

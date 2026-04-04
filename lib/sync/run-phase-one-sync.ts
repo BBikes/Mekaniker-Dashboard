@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
 const BACKFILL_DAYS = 90;
+const SCHEDULED_SYNC_LOCK_MINUTES = 20;
 
 type MechanicMapping = {
   id: string;
@@ -26,11 +27,12 @@ type DailyBaselineRow = {
 };
 
 export type SyncMode = "baseline" | "sync";
-type SyncLogType = SyncMode | "backfill";
+type MaterialSyncLogType = SyncMode | "backfill";
+type SyncLogType = MaterialSyncLogType | "scheduled";
 
 export type SyncResult = {
   syncLogId: string;
-  mode: SyncLogType;
+  mode: MaterialSyncLogType;
   statDate: string;
   httpCalls: number;
   materialsSeen: number;
@@ -46,8 +48,35 @@ export type SyncResult = {
   };
 };
 
+type ScheduledMetrics = {
+  httpCalls: number;
+  materialsSeen: number;
+  rowsUpserted: number;
+  rowsCorrected: number;
+  anomalyCount: number;
+};
+
+export type ScheduledSyncStartResult =
+  | {
+      skipped: true;
+      runningSyncLogId: string;
+      runningSyncType: SyncLogType;
+      startedAt: string | null;
+      lockWindowMinutes: number;
+    }
+  | {
+      skipped: false;
+      syncLogId: string;
+      startedAt: string;
+      lockWindowMinutes: number;
+    };
+
 function roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function minutesAgoIso(minutes: number) {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
 }
 
 function dateDaysAgo(daysAgo: number) {
@@ -128,6 +157,107 @@ async function completeSyncLog(syncLogId: string, patch: Record<string, unknown>
   if (error) {
     throw new Error(`Failed to update sync log ${syncLogId}: ${error.message}`);
   }
+}
+
+export function aggregateScheduledMetrics(results: Array<SyncResult | null>): ScheduledMetrics {
+  return results.reduce<ScheduledMetrics>(
+    (totals, result) => {
+      if (!result) {
+        return totals;
+      }
+
+      totals.httpCalls += result.httpCalls;
+      totals.materialsSeen += result.materialsSeen;
+      totals.rowsUpserted += result.rowsUpserted;
+      totals.rowsCorrected += result.rowsCorrected;
+      totals.anomalyCount += result.anomalyCount;
+      return totals;
+    },
+    {
+      httpCalls: 0,
+      materialsSeen: 0,
+      rowsUpserted: 0,
+      rowsCorrected: 0,
+      anomalyCount: 0,
+    },
+  );
+}
+
+export async function startScheduledSyncRun(lockWindowMinutes = SCHEDULED_SYNC_LOCK_MINUTES): Promise<ScheduledSyncStartResult> {
+  const supabase = createAdminClient();
+  const threshold = minutesAgoIso(lockWindowMinutes);
+  const { data: runningLog, error: runningError } = await supabase
+    .from("sync_event_log")
+    .select("id, sync_type, started_at")
+    .eq("status", "running")
+    .in("sync_type", ["scheduled", "backfill", "baseline", "sync"])
+    .gte("started_at", threshold)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (runningError) {
+    throw new Error(`Failed to inspect running sync jobs: ${runningError.message}`);
+  }
+
+  if (runningLog) {
+    return {
+      skipped: true,
+      runningSyncLogId: runningLog.id as string,
+      runningSyncType: runningLog.sync_type as SyncLogType,
+      startedAt: (runningLog.started_at as string | null) ?? null,
+      lockWindowMinutes,
+    };
+  }
+
+  const startedAt = toIsoTimestamp();
+  const { data, error } = await supabase
+    .from("sync_event_log")
+    .insert({
+      sync_type: "scheduled",
+      status: "running",
+      started_at: startedAt,
+      message: "scheduled sync started",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to create scheduled sync log: ${error?.message ?? "unknown error"}`);
+  }
+
+  return {
+    skipped: false,
+    syncLogId: data.id as string,
+    startedAt,
+    lockWindowMinutes,
+  };
+}
+
+export async function completeScheduledSyncRun(
+  syncLogId: string,
+  {
+    status,
+    message,
+    details,
+    metrics,
+  }: {
+    status: "completed" | "failed" | "skipped";
+    message: string;
+    details?: Record<string, unknown>;
+    metrics?: Partial<ScheduledMetrics>;
+  },
+) {
+  await completeSyncLog(syncLogId, {
+    status,
+    message,
+    http_calls: metrics?.httpCalls ?? 0,
+    materials_seen: metrics?.materialsSeen ?? 0,
+    rows_upserted: metrics?.rowsUpserted ?? 0,
+    rows_corrected: metrics?.rowsCorrected ?? 0,
+    anomaly_count: metrics?.anomalyCount ?? 0,
+    details_json: details ?? {},
+  });
 }
 
 async function loadRowsForDate(statDate: string) {
