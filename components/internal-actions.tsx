@@ -8,6 +8,28 @@ type ActionState = {
   error: boolean;
 } | null;
 
+function toUiErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  if (message.includes("Missing required environment variable: SUPABASE_URL")) {
+    return "Server-sync mangler Supabase URL.";
+  }
+
+  if (message.includes("Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY")) {
+    return "Server-sync mangler Supabase service role key.";
+  }
+
+  if (message.includes("Missing required environment variable: C1ST_API_TOKEN")) {
+    return "Customers 1st-token mangler.";
+  }
+
+  if (message.includes("Ikke autoriseret")) {
+    return "Du er ikke logget ind længere. Genindlæs siden og log ind igen.";
+  }
+
+  return message || "Ukendt fejl";
+}
+
 async function request(url: string, options?: RequestInit) {
   const response = await fetch(url, {
     ...options,
@@ -25,9 +47,16 @@ async function request(url: string, options?: RequestInit) {
   return payload;
 }
 
-export function InternalActions() {
+export function InternalActions({
+  syncReady,
+  disabledReason,
+}: {
+  syncReady: boolean;
+  disabledReason?: string | null;
+}) {
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [state, setState] = useState<ActionState>(null);
+  const buttonsDisabled = pendingLabel !== null || !syncReady;
 
   async function run(label: string, url: string, options?: RequestInit) {
     setPendingLabel(label);
@@ -43,7 +72,7 @@ export function InternalActions() {
     } catch (error) {
       setState({
         label,
-        output: error instanceof Error ? error.message : "Ukendt fejl",
+        output: toUiErrorMessage(error),
         error: true,
       });
     } finally {
@@ -60,18 +89,16 @@ export function InternalActions() {
         </div>
         <p className="muted">Brug disse knapper som fallback eller til fejlsøgning af Customers 1st-sync.</p>
       </div>
+
+      {disabledReason ? <p className="flash flash--error action-note">{disabledReason}</p> : null}
+
       <div className="action-row">
-        <button
-          className="button"
-          disabled={pendingLabel !== null}
-          onClick={() => run("Probe API", "/api/sync/probe")}
-          type="button"
-        >
+        <button className="button" disabled={buttonsDisabled} onClick={() => run("Probe API", "/api/sync/probe")} type="button">
           {pendingLabel === "Probe API" ? "Kører..." : "Probe API"}
         </button>
         <button
           className="button button--ghost"
-          disabled={pendingLabel !== null}
+          disabled={buttonsDisabled}
           onClick={() =>
             run("Opret dagens baseline", "/api/sync/manual", {
               method: "POST",
@@ -84,7 +111,7 @@ export function InternalActions() {
         </button>
         <button
           className="button button--accent"
-          disabled={pendingLabel !== null}
+          disabled={buttonsDisabled}
           onClick={() =>
             run("Kør sync nu", "/api/sync/manual", {
               method: "POST",

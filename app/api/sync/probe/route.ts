@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { toOperatorErrorMessage } from "@/lib/env";
 import { probeCustomersFirstTicketMaterials } from "@/lib/sync/run-phase-one-sync";
 import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
@@ -17,7 +18,7 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Unknown probe failure",
+        error: toOperatorErrorMessage(error, "Ukendt probe-fejl."),
       },
       { status: 500 },
     );

@@ -2,7 +2,6 @@ import "server-only";
 
 import { CustomersFirstClient } from "@/lib/c1st/client";
 import type { NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-material";
-import { getServerConfig } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
@@ -19,11 +18,17 @@ type MechanicMapping = {
 };
 
 type DailyBaselineRow = {
+  stat_date: string;
+  ticket_id: number;
+  mechanic_item_no: string;
   mechanic_id: string;
   baseline_quantity: number;
   current_quantity: number;
   source_payment_id: number | null;
+  source_amountpaid: number | null;
+  source_updated_at: string | null;
   ticket_material_id: number;
+  last_seen_at: string | null;
 };
 
 export type SyncMode = "baseline" | "sync";
@@ -85,8 +90,12 @@ function dateDaysAgo(daysAgo: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function resolveMaterialStatDate(material: NormalizedTicketMaterial) {
-  return material.sourceDate ?? material.updatedAt?.slice(0, 10) ?? null;
+function atStartOfDay(date: string) {
+  return `${date} 00:00:00`;
+}
+
+function resolveMaterialStatDate(material: NormalizedTicketMaterial, fallbackDate?: string | null) {
+  return material.sourceDate ?? material.updatedAt?.slice(0, 10) ?? fallbackDate ?? null;
 }
 
 function buildBaselineAnomaly(existing: DailyBaselineRow | undefined, material: NormalizedTicketMaterial, mode: SyncMode): string | null {
@@ -107,6 +116,27 @@ function buildBaselineAnomaly(existing: DailyBaselineRow | undefined, material: 
   }
 
   return null;
+}
+
+async function fetchTicketScopedMaterials(ticketIds: number[]) {
+  const client = new CustomersFirstClient();
+  const uniqueTicketIds = [...new Set(ticketIds)];
+  const materialsByTicketId = new Map<number, NormalizedTicketMaterial[]>();
+  let httpCalls = 0;
+  let materialsSeen = 0;
+
+  for (const ticketId of uniqueTicketIds) {
+    const response = await client.listAllTicketMaterialsForTicket(ticketId);
+    materialsByTicketId.set(ticketId, response.normalizedItems);
+    httpCalls += response.httpCalls;
+    materialsSeen += response.normalizedItems.length;
+  }
+
+  return {
+    materialsByTicketId,
+    httpCalls,
+    materialsSeen,
+  };
 }
 
 async function fetchActiveMappings() {
@@ -264,7 +294,19 @@ async function loadRowsForDate(statDate: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("daily_ticket_item_baselines")
-    .select("mechanic_id, baseline_quantity, current_quantity, source_payment_id, ticket_material_id")
+    .select(`
+      stat_date,
+      ticket_id,
+      mechanic_item_no,
+      mechanic_id,
+      baseline_quantity,
+      current_quantity,
+      source_payment_id,
+      source_amountpaid,
+      source_updated_at,
+      ticket_material_id,
+      last_seen_at
+    `)
     .eq("stat_date", statDate);
 
   if (error) {
@@ -274,7 +316,7 @@ async function loadRowsForDate(statDate: string) {
   return (data ?? []) as DailyBaselineRow[];
 }
 
-async function loadRowsForDateRange(fromDate: string, toDate: string) {
+async function loadExistingHistoricalKeys(fromDate: string, toDate: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("daily_ticket_item_baselines")
@@ -290,6 +332,53 @@ async function loadRowsForDateRange(fromDate: string, toDate: string) {
     statDate: row.stat_date as string,
     ticketMaterialId: Number(row.ticket_material_id),
   }));
+}
+
+async function loadPreviousRowsByMaterialId(statDate: string, ticketMaterialIds: number[]) {
+  if (ticketMaterialIds.length === 0) {
+    return new Map<number, DailyBaselineRow>();
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("daily_ticket_item_baselines")
+    .select(`
+      stat_date,
+      ticket_id,
+      mechanic_item_no,
+      mechanic_id,
+      baseline_quantity,
+      current_quantity,
+      source_payment_id,
+      source_amountpaid,
+      source_updated_at,
+      ticket_material_id,
+      last_seen_at
+    `)
+    .lt("stat_date", statDate)
+    .in("ticket_material_id", ticketMaterialIds)
+    .order("stat_date", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load previous baseline rows: ${error.message}`);
+  }
+
+  const latestByMaterialId = new Map<number, DailyBaselineRow>();
+  for (const row of (data ?? []) as DailyBaselineRow[]) {
+    if (!latestByMaterialId.has(row.ticket_material_id)) {
+      latestByMaterialId.set(row.ticket_material_id, row);
+    }
+  }
+
+  return latestByMaterialId;
+}
+
+async function loadCarryForwardRows(statDate: string) {
+  const previousDate = dateDaysAgo(1);
+  const [todayRows, previousRows] = await Promise.all([loadRowsForDate(statDate), loadRowsForDate(previousDate)]);
+  const existingToday = new Set(todayRows.map((row) => row.ticket_material_id));
+
+  return previousRows.filter((row) => row.source_payment_id === null && !existingToday.has(row.ticket_material_id));
 }
 
 async function recalculateTotals(statDate: string, affectedMechanicIds: string[]) {
@@ -365,11 +454,6 @@ async function recalculateTotals(statDate: string, affectedMechanicIds: string[]
 }
 
 async function getLastSuccessfulSyncTimestamp() {
-  const config = getServerConfig();
-  if (!config.c1stUseUpdatedAfter) {
-    return undefined;
-  }
-
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("sync_event_log")
@@ -384,7 +468,7 @@ async function getLastSuccessfulSyncTimestamp() {
     throw new Error(`Failed to load last successful sync timestamp: ${error.message}`);
   }
 
-  return (data?.finished_at as string | undefined) ?? undefined;
+  return (data?.finished_at as string | undefined) ?? atStartOfDay(getCopenhagenDateString());
 }
 
 async function hasCompletedBackfill() {
@@ -406,14 +490,32 @@ async function hasCompletedBackfill() {
 
 export async function probeCustomersFirstTicketMaterials() {
   const client = new CustomersFirstClient();
-  const page = await client.listTicketMaterialsPage({ paginationStart: 0 });
+  const updatedAfter = atStartOfDay(getCopenhagenDateString());
+  const ticketsPage = await client.listTicketsPage({ paginationStart: 0, paginationPageLength: 5, updatedAfter });
+  const sampleTicket = ticketsPage.normalizedItems[0] ?? null;
+  const materialsPage = sampleTicket
+    ? await client.listTicketMaterialsPage({ paginationStart: 0, paginationPageLength: 5, ticketId: sampleTicket.ticketId })
+    : null;
 
   return {
-    rawItemCount: page.rawItems.length,
-    normalizedItemCount: page.normalizedItems.length,
-    nextStart: page.nextStart,
-    sampleRawItem: page.rawItems[0] ?? null,
-    sampleNormalizedItem: page.normalizedItems[0] ?? null,
+    strategy: "tickets.updated_after -> ticket materials by ticketid -> filter on mechanic item numbers",
+    updatedAfter,
+    ticketProbe: {
+      rawItemCount: ticketsPage.rawItems.length,
+      normalizedItemCount: ticketsPage.normalizedItems.length,
+      nextStart: ticketsPage.nextStart,
+      sampleRawItem: ticketsPage.rawItems[0] ?? null,
+      sampleNormalizedItem: sampleTicket,
+    },
+    ticketMaterialsProbe: materialsPage
+      ? {
+          rawItemCount: materialsPage.rawItems.length,
+          normalizedItemCount: materialsPage.normalizedItems.length,
+          nextStart: materialsPage.nextStart,
+          sampleRawItem: materialsPage.rawItems[0] ?? null,
+          sampleNormalizedItem: materialsPage.normalizedItems[0] ?? null,
+        }
+      : null,
   };
 }
 
@@ -423,19 +525,27 @@ export async function runHistoricalBackfill(days = BACKFILL_DAYS): Promise<SyncR
   try {
     const untilDate = getCopenhagenDateString();
     const fromDate = dateDaysAgo(days - 1);
-    const [mappings, existingRows] = await Promise.all([fetchActiveMappings(), loadRowsForDateRange(fromDate, untilDate)]);
+    const updatedAfter = atStartOfDay(fromDate);
+    const [mappings, existingRows] = await Promise.all([fetchActiveMappings(), loadExistingHistoricalKeys(fromDate, untilDate)]);
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
     const existingKeys = new Set(existingRows.map((row) => `${row.statDate}:${row.ticketMaterialId}`));
     const client = new CustomersFirstClient();
-    const allMaterials = await client.listAllTicketMaterials();
+    const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
+    const ticketDateById = new Map(
+      updatedTickets.normalizedItems.map((ticket) => [
+        ticket.ticketId,
+        ticket.updatedAt?.slice(0, 10) ?? ticket.createdAt?.slice(0, 10) ?? null,
+      ]),
+    );
+    const ticketMaterials = await fetchTicketScopedMaterials(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
     const now = toIsoTimestamp();
     const unmappedProductNos = new Set<string>();
     const affectedByDate = new Map<string, Set<string>>();
     let missingProductNoCount = 0;
     let mappedMaterialsSeen = 0;
 
-    const upserts = allMaterials.normalizedItems.flatMap((material) => {
-      const statDate = resolveMaterialStatDate(material);
+    const upserts = [...ticketMaterials.materialsByTicketId.entries()].flatMap(([ticketId, materials]) => materials.flatMap((material) => {
+      const statDate = resolveMaterialStatDate(material, ticketDateById.get(ticketId));
       if (!statDate || statDate < fromDate || statDate > untilDate) {
         return [];
       }
@@ -482,7 +592,7 @@ export async function runHistoricalBackfill(days = BACKFILL_DAYS): Promise<SyncR
           updated_at: now,
         },
       ];
-    });
+    }));
 
     if (upserts.length > 0) {
       const supabase = createAdminClient();
@@ -503,8 +613,8 @@ export async function runHistoricalBackfill(days = BACKFILL_DAYS): Promise<SyncR
       syncLogId,
       mode: "backfill",
       statDate: untilDate,
-      httpCalls: allMaterials.httpCalls,
-      materialsSeen: allMaterials.normalizedItems.length,
+      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls,
+      materialsSeen: ticketMaterials.materialsSeen,
       mappedMaterialsSeen,
       rowsUpserted: upserts.length,
       rowsCorrected: 0,
@@ -520,13 +630,16 @@ export async function runHistoricalBackfill(days = BACKFILL_DAYS): Promise<SyncR
     await completeSyncLog(syncLogId, {
       status: "completed",
       http_calls: result.httpCalls,
-      tickets_seen: new Set(allMaterials.normalizedItems.map((item) => item.ticketId)).size,
+      tickets_seen: updatedTickets.normalizedItems.length,
       materials_seen: result.materialsSeen,
       rows_upserted: result.rowsUpserted,
       rows_corrected: result.rowsCorrected,
       anomaly_count: result.anomalyCount,
       message: `historical backfill completed for last ${days} days`,
-      details_json: result.details,
+      details_json: {
+        ...result.details,
+        updatedAfter,
+      },
     });
 
     return result;
@@ -549,17 +662,92 @@ export async function ensureHistoricalBackfill(days = BACKFILL_DAYS) {
 }
 
 export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
-  const updatedAfter = mode === "sync" ? await getLastSuccessfulSyncTimestamp() : undefined;
   const syncLogId = await createSyncLog(mode);
 
   try {
     const statDate = getCopenhagenDateString();
+    const now = toIsoTimestamp();
+
+    if (mode === "baseline") {
+      const carryForwardRows = await loadCarryForwardRows(statDate);
+      const upserts = carryForwardRows.map((row) => ({
+        stat_date: statDate,
+        ticket_material_id: row.ticket_material_id,
+        ticket_id: row.ticket_id,
+        mechanic_id: row.mechanic_id,
+        mechanic_item_no: row.mechanic_item_no,
+        baseline_quantity: roundNumber(row.current_quantity),
+        current_quantity: roundNumber(row.current_quantity),
+        today_added_quantity: 0,
+        today_added_hours: 0,
+        source_updated_at: row.source_updated_at,
+        source_payment_id: row.source_payment_id,
+        source_amountpaid: row.source_amountpaid,
+        last_seen_at: row.last_seen_at ?? now,
+        anomaly_code: null,
+        updated_at: now,
+      }));
+      const affectedMechanicIds = [...new Set(carryForwardRows.map((row) => row.mechanic_id))];
+      const supabase = createAdminClient();
+
+      if (upserts.length > 0) {
+        const { error } = await supabase.from("daily_ticket_item_baselines").upsert(upserts, {
+          onConflict: "stat_date,ticket_material_id",
+        });
+
+        if (error) {
+          throw new Error(`Failed to seed baseline rows: ${error.message}`);
+        }
+      }
+
+      await recalculateTotals(statDate, affectedMechanicIds);
+
+      const result: SyncResult = {
+        syncLogId,
+        mode,
+        statDate,
+        httpCalls: 0,
+        materialsSeen: 0,
+        mappedMaterialsSeen: 0,
+        rowsUpserted: upserts.length,
+        rowsCorrected: 0,
+        anomalyCount: 0,
+        details: {
+          unmappedProductNos: [],
+          missingProductNoCount: 0,
+          affectedMechanicIds,
+          visibilityAnomalies: [],
+        },
+      };
+
+      await completeSyncLog(syncLogId, {
+        status: "completed",
+        http_calls: 0,
+        tickets_seen: 0,
+        materials_seen: 0,
+        rows_upserted: result.rowsUpserted,
+        rows_corrected: 0,
+        anomaly_count: 0,
+        message: "baseline completed",
+        details_json: result.details,
+      });
+
+      return result;
+    }
+
+    const updatedAfter = await getLastSuccessfulSyncTimestamp();
     const [mappings, todayRows] = await Promise.all([fetchActiveMappings(), loadRowsForDate(statDate)]);
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
     const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
     const client = new CustomersFirstClient();
-    const allMaterials = await client.listAllTicketMaterials({ updatedAfter });
-    const now = toIsoTimestamp();
+    const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
+    const ticketMaterials = await fetchTicketScopedMaterials(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
+    const changedTicketIds = new Set(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
+    const allMaterials = [...ticketMaterials.materialsByTicketId.values()].flatMap((materials) => materials);
+    const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
+      statDate,
+      [...new Set(allMaterials.map((material) => material.ticketMaterialId))],
+    );
     const unmappedProductNos = new Set<string>();
     const affectedMechanicIds = new Set<string>();
     const seenMaterialIds = new Set<number>();
@@ -569,7 +757,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     let anomalyCount = 0;
     let mappedMaterialsSeen = 0;
 
-    const upserts = allMaterials.normalizedItems.flatMap((material) => {
+    const upserts = allMaterials.flatMap((material) => {
       const productNo = material.productNo?.trim() ?? null;
       if (!productNo) {
         missingProductNoCount += 1;
@@ -585,8 +773,8 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       mappedMaterialsSeen += 1;
       seenMaterialIds.add(material.ticketMaterialId);
       affectedMechanicIds.add(mapping.id);
-      const existingRow = existingRowsByMaterialId.get(material.ticketMaterialId);
-      const anomalyCode = buildBaselineAnomaly(existingRow, material, mode);
+      const existingRow = existingRowsByMaterialId.get(material.ticketMaterialId) ?? previousRowsByMaterialId.get(material.ticketMaterialId);
+      const anomalyCode = buildBaselineAnomaly(existingRow, material, "sync");
 
       if (anomalyCode !== null) {
         anomalyCount += 1;
@@ -595,13 +783,13 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
         }
       }
 
-      if (mode === "baseline" && existingRow) {
-        return [];
-      }
-
-      const baselineQuantity = mode === "baseline" ? material.amount : existingRow ? Number(existingRow.baseline_quantity) : 0;
+      const baselineQuantity = existingRowsByMaterialId.has(material.ticketMaterialId)
+        ? Number(existingRowsByMaterialId.get(material.ticketMaterialId)!.baseline_quantity)
+        : existingRow
+          ? Number(existingRow.current_quantity)
+          : 0;
       const currentQuantity = material.amount;
-      const todayAddedQuantity = mode === "baseline" ? 0 : currentQuantity - baselineQuantity;
+      const todayAddedQuantity = currentQuantity - baselineQuantity;
 
       return [
         {
@@ -635,27 +823,25 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       }
     }
 
-    if (mode === "sync") {
-      const invisibleRows = todayRows.filter((row) => !seenMaterialIds.has(row.ticket_material_id));
-      if (invisibleRows.length > 0) {
-        visibilityAnomalies.push(...invisibleRows.map((row) => row.ticket_material_id));
-        anomalyCount += invisibleRows.length;
+    const invisibleRows = todayRows.filter((row) => changedTicketIds.has(row.ticket_id) && !seenMaterialIds.has(row.ticket_material_id));
+    if (invisibleRows.length > 0) {
+      visibilityAnomalies.push(...invisibleRows.map((row) => row.ticket_material_id));
+      anomalyCount += invisibleRows.length;
 
-        const { error } = await supabase
-          .from("daily_ticket_item_baselines")
-          .update({
-            anomaly_code: "missing_in_latest_fetch",
-            updated_at: now,
-          })
-          .eq("stat_date", statDate)
-          .in(
-            "ticket_material_id",
-            invisibleRows.map((row) => row.ticket_material_id),
-          );
+      const { error } = await supabase
+        .from("daily_ticket_item_baselines")
+        .update({
+          anomaly_code: "missing_in_latest_fetch",
+          updated_at: now,
+        })
+        .eq("stat_date", statDate)
+        .in(
+          "ticket_material_id",
+          invisibleRows.map((row) => row.ticket_material_id),
+        );
 
-        if (error) {
-          throw new Error(`Failed to flag visibility anomalies: ${error.message}`);
-        }
+      if (error) {
+        throw new Error(`Failed to flag visibility anomalies: ${error.message}`);
       }
     }
 
@@ -665,8 +851,8 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       syncLogId,
       mode,
       statDate,
-      httpCalls: allMaterials.httpCalls,
-      materialsSeen: allMaterials.normalizedItems.length,
+      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls,
+      materialsSeen: ticketMaterials.materialsSeen,
       mappedMaterialsSeen,
       rowsUpserted: upserts.length,
       rowsCorrected,
@@ -682,7 +868,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     await completeSyncLog(syncLogId, {
       status: "completed",
       http_calls: result.httpCalls,
-      tickets_seen: new Set(allMaterials.normalizedItems.map((item) => item.ticketId)).size,
+      tickets_seen: updatedTickets.normalizedItems.length,
       materials_seen: result.materialsSeen,
       rows_upserted: result.rowsUpserted,
       rows_corrected: result.rowsCorrected,

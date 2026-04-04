@@ -1,6 +1,6 @@
 import { DashboardRefresh } from "@/components/dashboard-refresh";
 import { getDashboardData } from "@/lib/data/dashboard";
-import { getEnvPresence } from "@/lib/env";
+import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 import { formatCopenhagenDate, formatCopenhagenTime, formatHours, getCopenhagenDateString } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -8,17 +8,17 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const env = getEnvPresence();
 
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
+  if (!env.dashboardReady) {
     return (
       <main className="dashboard-shell">
         <section className="dashboard-card">
           <header className="dashboard-header">
             <div>
               <p className="eyebrow">TV-visning utilgængelig</p>
-              <h1>Supabase er ikke konfigureret</h1>
+              <h1>Serverdata er ikke klar</h1>
             </div>
           </header>
-          <p className="muted">Tilføj `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY`, og genindlæs siden.</p>
+          <p className="muted">{getDashboardReadinessMessage(env) ?? "Supabase er ikke konfigureret korrekt."}</p>
         </section>
       </main>
     );
@@ -38,7 +38,7 @@ export default async function DashboardPage() {
               <h1>Kunne ikke hente dagens tal</h1>
             </div>
           </header>
-          <p className="muted">{error instanceof Error ? error.message : "Ukendt fejl"}</p>
+          <p className="muted">{toOperatorErrorMessage(error)}</p>
         </section>
       </main>
     );

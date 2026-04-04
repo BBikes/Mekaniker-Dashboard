@@ -9,7 +9,7 @@ import {
   type PeriodMode,
   type ReportFilters,
 } from "@/lib/data/reports";
-import { getEnvPresence } from "@/lib/env";
+import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 import {
   formatCopenhagenDateTime,
   formatDecimal,
@@ -91,15 +91,15 @@ export default async function ReportsPage({
 }) {
   const env = getEnvPresence();
 
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
+  if (!env.dashboardReady) {
     return (
       <>
         <AppHeader activeHref="/reports" />
         <main className="page-shell">
           <section className="panel">
             <p className="eyebrow">Rapport utilgængelig</p>
-            <h2>Supabase er ikke konfigureret</h2>
-            <p className="muted">Tilføj `SUPABASE_URL` og `SUPABASE_SERVICE_ROLE_KEY`, og genindlæs siden.</p>
+            <h2>Serverdata er ikke klar</h2>
+            <p className="muted">{getDashboardReadinessMessage(env) ?? "Supabase er ikke konfigureret korrekt."}</p>
             <p className="inline-links">
               <Link href="/">Tilbage til kontrolpanel</Link>
             </p>
@@ -291,7 +291,7 @@ export default async function ReportsPage({
           <section className="panel">
             <p className="eyebrow">Rapport utilgængelig</p>
             <h2>Kunne ikke hente rapportdata</h2>
-            <p className="muted">{error instanceof Error ? error.message : "Ukendt fejl"}</p>
+            <p className="muted">{toOperatorErrorMessage(error)}</p>
             <p className="inline-links">
               <Link href="/">Tilbage til kontrolpanel</Link>
             </p>

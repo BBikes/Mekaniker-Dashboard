@@ -17,18 +17,24 @@ Kopiér `.env.example` til `.env.local` og udfyld:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `C1ST_API_TOKEN`
 - `CRON_SECRET`
 
 Valgfrit:
 
+- `SUPABASE_URL`
 - `C1ST_API_BASE_URL`
 - `C1ST_DEFAULT_PAGE_LENGTH`
 - `C1ST_USE_UPDATED_AFTER`
 - `C1ST_UPDATED_AFTER_PARAM`
 - `C1ST_EXTRA_TICKET_MATERIAL_QUERY`
+
+Bemærk:
+
+- serveren bruger `SUPABASE_URL`, hvis den er sat
+- ellers falder serveren tilbage til `NEXT_PUBLIC_SUPABASE_URL`
+- efter ændringer i Vercel environment variables skal appen redeployes
 
 ## Supabase setup
 

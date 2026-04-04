@@ -4,13 +4,62 @@ import { AppHeader } from "@/components/app-header";
 import { InternalActions } from "@/components/internal-actions";
 import { getDashboardData } from "@/lib/data/dashboard";
 import { getActiveMechanics } from "@/lib/data/reports";
-import { getEnvPresence } from "@/lib/env";
+import { getDashboardReadinessMessage, getEnvPresence, getSyncReadinessMessage, toOperatorErrorMessage } from "@/lib/env";
 import { formatCopenhagenTime, formatHours } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+type StatusRow = {
+  label: string;
+  present: boolean;
+};
+
+type StatusGroup = {
+  title: string;
+  summary: string;
+  ready: boolean;
+  rows: StatusRow[];
+};
+
+function getStatusGroups() {
   const env = getEnvPresence();
+
+  const groups: StatusGroup[] = [
+    {
+      title: "Browser og login",
+      summary: "Bruges til login og den offentlige Supabase-klient i browseren.",
+      ready: env.browserAuthReady,
+      rows: [
+        { label: "NEXT_PUBLIC_SUPABASE_URL", present: env.publicSupabaseUrl },
+        { label: "NEXT_PUBLIC_SUPABASE_ANON_KEY", present: env.supabaseAnonKey },
+      ],
+    },
+    {
+      title: "Server og datasync",
+      summary: "Bruges til dashboarddata, rapporter og manuel sync mod Customers 1st.",
+      ready: env.syncReady,
+      rows: [
+        { label: "Supabase URL (SUPABASE_URL eller NEXT_PUBLIC_SUPABASE_URL)", present: env.resolvedSupabaseUrl },
+        { label: "SUPABASE_SERVICE_ROLE_KEY", present: env.supabaseServiceRoleKey },
+        { label: "C1ST_API_TOKEN", present: env.c1stApiToken },
+      ],
+    },
+    {
+      title: "Scheduler",
+      summary: "Bruges af Supabase Cron til automatisk sync hvert 10. minut.",
+      ready: env.schedulerReady,
+      rows: [{ label: "CRON_SECRET", present: env.cronSecret }],
+    },
+  ];
+
+  return { env, groups };
+}
+
+export default async function HomePage() {
+  const { env, groups } = getStatusGroups();
+  const dashboardReadinessMessage = getDashboardReadinessMessage(env);
+  const syncReadinessMessage = getSyncReadinessMessage(env);
+
   let loadError: string | null = null;
   let mechanics: Awaited<ReturnType<typeof getActiveMechanics>> = [];
   let dashboard: Awaited<ReturnType<typeof getDashboardData>> = {
@@ -20,14 +69,14 @@ export default async function HomePage() {
     latestSync: null,
   };
 
-  if (env.supabaseUrl && env.supabaseServiceRoleKey) {
+  if (env.dashboardReady) {
     try {
       [dashboard, mechanics] = await Promise.all([getDashboardData(), getActiveMechanics()]);
     } catch (error) {
-      loadError = error instanceof Error ? error.message : "Kunne ikke hente data fra Supabase.";
+      loadError = toOperatorErrorMessage(error, "Kunne ikke hente data fra Supabase.");
     }
   } else {
-    loadError = "Tilføj Supabase-miljøvariablerne for at hente interne data.";
+    loadError = dashboardReadinessMessage;
   }
 
   const totalHoursToday = dashboard.rows.reduce((sum, row) => sum + row.hours, 0);
@@ -59,7 +108,7 @@ export default async function HomePage() {
           </p>
         </section>
 
-        <section className="panel-grid">
+        <section className="panel-grid panel-grid--metrics">
           <article className="panel">
             <p className="eyebrow">I dag</p>
             <h2>Registreret tid</h2>
@@ -83,56 +132,46 @@ export default async function HomePage() {
         </section>
 
         {loadError ? (
-          <section className="panel" style={{ marginBottom: 24 }}>
+          <section className="panel panel--warning" style={{ marginBottom: 24 }}>
             <p className="eyebrow">Opsætning</p>
             <h2>Data er ikke klar endnu</h2>
             <p className="muted">{loadError}</p>
           </section>
         ) : null}
 
-        <section className="panel-grid">
-          <section className="panel">
+        <section className="panel-grid panel-grid--features">
+          <section className="panel panel--status">
             <div className="panel__header">
               <div>
                 <p className="eyebrow">Miljø</p>
-                <h2>Påkrævede nøgler</h2>
+                <h2>Driftsklar status</h2>
               </div>
             </div>
-            <div className="status-list">
-              <div className="status-item">
-                <span>NEXT_PUBLIC_SUPABASE_URL</span>
-                <span className={`pill ${env.supabaseUrl ? "pill--ok" : "pill--missing"}`}>
-                  {env.supabaseUrl ? "Til stede" : "Mangler"}
-                </span>
-              </div>
-              <div className="status-item">
-                <span>NEXT_PUBLIC_SUPABASE_ANON_KEY</span>
-                <span className={`pill ${env.supabaseAnonKey ? "pill--ok" : "pill--missing"}`}>
-                  {env.supabaseAnonKey ? "Til stede" : "Mangler"}
-                </span>
-              </div>
-              <div className="status-item">
-                <span>SUPABASE_SERVICE_ROLE_KEY</span>
-                <span className={`pill ${env.supabaseServiceRoleKey ? "pill--ok" : "pill--missing"}`}>
-                  {env.supabaseServiceRoleKey ? "Til stede" : "Mangler"}
-                </span>
-              </div>
-              <div className="status-item">
-                <span>C1ST_API_TOKEN</span>
-                <span className={`pill ${env.c1stApiToken ? "pill--ok" : "pill--missing"}`}>
-                  {env.c1stApiToken ? "Til stede" : "Mangler"}
-                </span>
-              </div>
-              <div className="status-item">
-                <span>CRON_SECRET</span>
-                <span className={`pill ${env.cronSecret ? "pill--ok" : "pill--missing"}`}>
-                  {env.cronSecret ? "Til stede" : "Mangler"}
-                </span>
-              </div>
+            <div className="status-groups">
+              {groups.map((group) => (
+                <section className="status-group" key={group.title}>
+                  <div className="status-group__header">
+                    <div>
+                      <h3 className="status-group__title">{group.title}</h3>
+                      <p className="muted status-note">{group.summary}</p>
+                    </div>
+                    <span className={`pill ${group.ready ? "pill--ok" : "pill--missing"}`}>
+                      {group.ready ? "Klar" : "Mangler"}
+                    </span>
+                  </div>
+                  <div className="status-list">
+                    {group.rows.map((row) => (
+                      <div className="status-item" key={row.label}>
+                        <span className="status-item__label">{row.label}</span>
+                        <span className={`pill ${row.present ? "pill--ok" : "pill--missing"}`}>
+                          {row.present ? "Til stede" : "Mangler"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
-            <p className="muted" style={{ marginTop: 16 }}>
-              Automatisk sync kører via Supabase Cron hvert 10. minut.
-            </p>
           </section>
 
           <section className="panel panel--link">
@@ -177,7 +216,7 @@ export default async function HomePage() {
           </section>
         </section>
 
-        <InternalActions />
+        <InternalActions disabledReason={syncReadinessMessage} syncReady={env.syncReady} />
       </main>
     </>
   );
