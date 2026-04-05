@@ -1,22 +1,18 @@
 import Link from "next/link";
 
-import type { AdminStatus, AdminSummaryRow, ExportMode, PeriodMode, SortDirection } from "@/lib/data/reports";
+import type { AdminSummaryRow, PeriodMode, SortDirection } from "@/lib/data/reports";
 import { formatDecimal, formatHours, formatPercent } from "@/lib/time";
 
 import { getFulfillmentStyle } from "./fulfillment-color";
 
 type SummaryFilterState = {
   dir: SortDirection;
-  drawerMechanicId?: string;
   fromDate: string;
   mechanicIds: string[];
-  pageSize: number;
   periodMode: PeriodMode;
   q: string;
   sort: string;
-  status: AdminStatus;
   toDate: string;
-  view: ExportMode;
 };
 
 type SummaryTableProps = {
@@ -35,27 +31,16 @@ function buildReportsHref(filters: SummaryFilterState, overrides: Partial<Summar
     fromDate: next.fromDate,
     toDate: next.toDate,
     periodMode: next.periodMode,
-    view: next.view,
     sort: next.sort,
     dir: next.dir,
-    page: "1",
-    pageSize: String(next.pageSize),
   });
 
   if (next.mechanicIds.length > 0) {
     params.set("mechanicIds", next.mechanicIds.join(","));
   }
 
-  if (next.status !== "all") {
-    params.set("status", next.status);
-  }
-
   if (next.q) {
     params.set("q", next.q);
-  }
-
-  if (next.drawerMechanicId) {
-    params.set("drawerMechanicId", next.drawerMechanicId);
   }
 
   return `/reports?${params.toString()}`;
@@ -79,10 +64,8 @@ function SortHeader({
   sortKey: SortKey;
 }) {
   const isActive = filters.sort === sortKey;
-  const nextDir = getNextDirection(filters, sortKey);
   const href = buildReportsHref(filters, {
-    dir: nextDir,
-    drawerMechanicId: undefined,
+    dir: getNextDirection(filters, sortKey),
     sort: sortKey,
   });
 
@@ -102,7 +85,6 @@ export function SummaryTable({ filters, rows }: SummaryTableProps) {
           <p className="eyebrow">Summeret visning</p>
           <h2>Timer og målopfyldelse pr. mekaniker</h2>
         </div>
-        <p className="muted">Klik på mekanikernavnet for at åbne dag-for-dag-detaljer i drawer&apos;en.</p>
       </div>
 
       <div className="table-shell">
@@ -142,17 +124,9 @@ export function SummaryTable({ filters, rows }: SummaryTableProps) {
             <tbody>
               {rows.length > 0 ? (
                 rows.map((row) => {
-                  const drawerHref = buildReportsHref(filters, {
-                    drawerMechanicId: row.mechanicId,
-                  });
-
                   return (
                     <tr key={row.mechanicId}>
-                      <td>
-                        <Link className="table-link" href={drawerHref}>
-                          {row.mechanicName}
-                        </Link>
-                      </td>
+                      <td>{row.mechanicName}</td>
                       <td>{formatDecimal(row.quarters)}</td>
                       <td>{formatHours(row.hours)}</td>
                       <td>{formatHours(row.targetHours)}</td>

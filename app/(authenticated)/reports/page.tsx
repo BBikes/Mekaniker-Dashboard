@@ -1,20 +1,14 @@
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
-import { DetailDrawer } from "@/app/(authenticated)/reports/detail-drawer";
-import { DetailedTable } from "@/app/(authenticated)/reports/detailed-table";
 import { FilterBar } from "@/app/(authenticated)/reports/filter-bar";
 import { KpiRow } from "@/app/(authenticated)/reports/kpi-row";
 import { SummaryTable } from "@/app/(authenticated)/reports/summary-table";
 import {
   getActiveMechanics,
   getAdminSummary,
-  getDetailedPage,
   getKpiSnapshot,
-  type AdminDetailedFilters,
   type AdminFilters,
-  type AdminStatus,
-  type ExportMode,
   type PeriodMode,
   type SortDirection,
 } from "@/lib/data/reports";
@@ -29,21 +23,15 @@ type ReportsSearchParams = Record<string, SearchParamsValue>;
 
 type ReportsPageFilters = {
   dir: SortDirection;
-  drawerMechanicId?: string;
   fromDate: string;
   mechanicIds: string[];
-  page: number;
-  pageSize: number;
   periodMode: PeriodMode;
   q: string;
   sort: string;
-  status: AdminStatus;
   toDate: string;
-  view: ExportMode;
 };
 
 const SUMMARY_SORTS = new Set(["mechanic", "quarters", "hours", "target", "variance", "pct", "tickets", "avgDay", "avgTicket"]);
-const DETAILED_SORTS = new Set(["date", "mechanic", "ticket", "item", "baseline", "current", "added", "hours", "paid", "updated", "anomaly"]);
 
 function readFirstParam(value: SearchParamsValue): string | undefined {
   if (Array.isArray(value)) {
@@ -69,25 +57,8 @@ function parseMechanicIds(params: ReportsSearchParams): string[] {
   return [...new Set(rawValues.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean))];
 }
 
-function parsePositiveInt(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return fallback;
-  }
-
-  return Math.floor(parsed);
-}
-
-function getDefaultDirection(view: ExportMode, sort: string): SortDirection {
-  if (view === "summary") {
-    return sort === "mechanic" ? "asc" : "desc";
-  }
-
-  if (sort === "mechanic" || sort === "item" || sort === "ticket" || sort === "anomaly") {
-    return "asc";
-  }
-
-  return "desc";
+function getDefaultDirection(sort: string): SortDirection {
+  return sort === "mechanic" ? "asc" : "desc";
 }
 
 function parseFilters(params: ReportsSearchParams): ReportsPageFilters {
@@ -99,37 +70,21 @@ function parseFilters(params: ReportsSearchParams): ReportsPageFilters {
     periodModeValue === "weekly_avg" || periodModeValue === "monthly_avg" || periodModeValue === "daily"
       ? periodModeValue
       : "daily";
-  const viewValue = readFirstParam(params.view) ?? readFirstParam(params.exportMode);
-  const view: ExportMode = viewValue === "detailed" ? "detailed" : "summary";
-  const statusValue = readFirstParam(params.status);
-  const status: AdminStatus =
-    statusValue === "paid" || statusValue === "open" || statusValue === "anomaly" || statusValue === "all"
-      ? statusValue
-      : "all";
   const mechanicIds = parseMechanicIds(params);
-  const pageSizeRaw = parsePositiveInt(readFirstParam(params.pageSize), 50);
-  const pageSize = pageSizeRaw === 25 || pageSizeRaw === 50 || pageSizeRaw === 100 || pageSizeRaw === 200 ? pageSizeRaw : 50;
   const q = readFirstParam(params.q)?.trim() ?? "";
-  const drawerMechanicId = readFirstParam(params.drawerMechanicId) || undefined;
-  const allowedSorts = view === "summary" ? SUMMARY_SORTS : DETAILED_SORTS;
   const sortValue = readFirstParam(params.sort);
-  const sort = sortValue && allowedSorts.has(sortValue) ? sortValue : view === "summary" ? "hours" : "date";
+  const sort = sortValue && SUMMARY_SORTS.has(sortValue) ? sortValue : "hours";
   const dirValue = readFirstParam(params.dir);
-  const dir = dirValue === "asc" || dirValue === "desc" ? dirValue : getDefaultDirection(view, sort);
+  const dir = dirValue === "asc" || dirValue === "desc" ? dirValue : getDefaultDirection(sort);
 
   return {
     dir,
-    drawerMechanicId,
     fromDate,
     mechanicIds,
-    page: parsePositiveInt(readFirstParam(params.page), 1),
-    pageSize,
     periodMode,
     q,
     sort,
-    status,
     toDate,
-    view,
   };
 }
 
@@ -142,27 +97,16 @@ function buildReportsHref(filters: ReportsPageFilters, overrides: Partial<Report
     fromDate: next.fromDate,
     toDate: next.toDate,
     periodMode: next.periodMode,
-    view: next.view,
     sort: next.sort,
     dir: next.dir,
-    page: String(next.page),
-    pageSize: String(next.pageSize),
   });
 
   if (next.mechanicIds.length > 0) {
     params.set("mechanicIds", next.mechanicIds.join(","));
   }
 
-  if (next.status !== "all") {
-    params.set("status", next.status);
-  }
-
   if (next.q) {
     params.set("q", next.q);
-  }
-
-  if (next.drawerMechanicId) {
-    params.set("drawerMechanicId", next.drawerMechanicId);
   }
 
   return `/reports?${params.toString()}`;
@@ -177,17 +121,12 @@ function buildExportHref(filters: ReportsPageFilters, overrides: Partial<Reports
     fromDate: next.fromDate,
     toDate: next.toDate,
     periodMode: next.periodMode,
-    view: next.view,
     sort: next.sort,
     dir: next.dir,
   });
 
   if (next.mechanicIds.length > 0) {
     params.set("mechanicIds", next.mechanicIds.join(","));
-  }
-
-  if (next.status !== "all") {
-    params.set("status", next.status);
   }
 
   if (next.q) {
@@ -249,15 +188,6 @@ function toAdminFilters(filters: ReportsPageFilters): AdminFilters {
   };
 }
 
-function toDetailedFilters(filters: ReportsPageFilters): AdminDetailedFilters {
-  return {
-    ...toAdminFilters(filters),
-    page: filters.page,
-    pageSize: filters.pageSize,
-    status: filters.status,
-  };
-}
-
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -287,9 +217,7 @@ export default async function ReportsPage({
   const presets = getQuickPresets().map((preset) => ({
     active: filters.fromDate === preset.from && filters.toDate === preset.to,
     href: buildReportsHref(filters, {
-      drawerMechanicId: undefined,
       fromDate: preset.from,
-      page: 1,
       toDate: preset.to,
     }),
     label: preset.label,
@@ -297,42 +225,11 @@ export default async function ReportsPage({
   const exportHref = buildExportHref(filters);
 
   try {
-    if (filters.view === "summary") {
-      const adminFilters = toAdminFilters(filters);
-      const [mechanics, kpis, rows] = await Promise.all([
-        getActiveMechanics(),
-        getKpiSnapshot(adminFilters),
-        getAdminSummary(adminFilters),
-      ]);
-
-      return (
-        <>
-          <AppHeader activeHref="/reports" />
-          <main className="page-shell">
-            <section className="hero">
-              <div className="hero__top">
-                <div>
-                  <p className="eyebrow">Rapportering</p>
-                  <h1>Admin-panel for værkstedsdata</h1>
-                </div>
-              </div>
-              <p>Filtrér historik, gennemse performance pr. mekaniker og eksportér CSV uden at røre TV-dashboardet.</p>
-            </section>
-
-            <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
-            <KpiRow kpis={kpis} />
-            <SummaryTable filters={filters} rows={rows} />
-            <DetailDrawer filters={filters} mechanics={mechanics} />
-          </main>
-        </>
-      );
-    }
-
     const adminFilters = toAdminFilters(filters);
-    const [mechanics, kpis, pageData] = await Promise.all([
+    const [mechanics, kpis, rows] = await Promise.all([
       getActiveMechanics(),
       getKpiSnapshot(adminFilters),
-      getDetailedPage(toDetailedFilters(filters)),
+      getAdminSummary(adminFilters),
     ]);
 
     return (
@@ -346,13 +243,12 @@ export default async function ReportsPage({
                 <h1>Admin-panel for værkstedsdata</h1>
               </div>
             </div>
-            <p>Filtrér historik, søg på ticketlinjer og eksportér præcist det samme udsnit, som tabellen viser.</p>
+            <p>Filtrér historik, gennemse performance pr. mekaniker og eksportér CSV uden at røre TV-dashboardet.</p>
           </section>
 
           <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
           <KpiRow kpis={kpis} />
-          <DetailedTable filters={filters} pageData={pageData} />
-          <DetailDrawer filters={filters} mechanics={mechanics} />
+          <SummaryTable filters={filters} rows={rows} />
         </main>
       </>
     );

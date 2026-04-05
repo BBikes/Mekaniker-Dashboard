@@ -95,10 +95,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
               <label htmlFor="new-mechanic-item-no">Varenummer</label>
               <input id="new-mechanic-item-no" name="mechanic_item_no" required type="text" />
             </div>
-            <div className="field">
-              <label htmlFor="new-daily-target-hours">Dagsmål (timer)</label>
-              <input defaultValue="8" id="new-daily-target-hours" min="0" name="daily_target_hours" step="0.25" type="number" />
-            </div>
+
             <div className="field">
               <label htmlFor="new-display-order">Rækkefølge</label>
               <input defaultValue={mechanics.length} id="new-display-order" min="0" name="display_order" step="1" type="number" />
@@ -128,7 +125,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   <tr>
                     <th>Navn</th>
                     <th>Varenummer</th>
-                    <th>Dagsmål</th>
                     <th>Rækkefølge</th>
                     <th>Aktiv</th>
                     <th>Handling</th>
@@ -146,16 +142,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                         <td>
                           <input defaultValue={mechanic.mechanic_item_no} form={formId} name="mechanic_item_no" required type="text" />
                         </td>
-                        <td>
-                          <input
-                            defaultValue={mechanic.daily_target_hours}
-                            form={formId}
-                            min="0"
-                            name="daily_target_hours"
-                            step="0.25"
-                            type="number"
-                          />
-                        </td>
+
                         <td>
                           <input defaultValue={mechanic.display_order} form={formId} min="0" name="display_order" step="1" type="number" />
                         </td>

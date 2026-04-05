@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { ActiveMechanic, AdminStatus, ExportMode, PeriodMode, SortDirection } from "@/lib/data/reports";
+import type { ActiveMechanic, PeriodMode, SortDirection } from "@/lib/data/reports";
 import { getSummaryRows } from "@/lib/data/reports";
 import { formatDecimal, formatHours, formatPercent, formatShortCopenhagenDate } from "@/lib/time";
 
@@ -11,14 +11,10 @@ type DrawerFilterState = {
   drawerMechanicId?: string;
   fromDate: string;
   mechanicIds: string[];
-  page: number;
-  pageSize: number;
   periodMode: PeriodMode;
   q: string;
   sort: string;
-  status: AdminStatus;
   toDate: string;
-  view: ExportMode;
 };
 
 type DetailDrawerProps = {
@@ -35,19 +31,12 @@ function buildReportsHref(filters: DrawerFilterState, overrides: Partial<DrawerF
     fromDate: next.fromDate,
     toDate: next.toDate,
     periodMode: next.periodMode,
-    view: next.view,
     sort: next.sort,
     dir: next.dir,
-    page: String(next.page),
-    pageSize: String(next.pageSize),
   });
 
   if (next.mechanicIds.length > 0) {
     params.set("mechanicIds", next.mechanicIds.join(","));
-  }
-
-  if (next.status !== "all") {
-    params.set("status", next.status);
   }
 
   if (next.q) {
@@ -70,7 +59,6 @@ export async function DetailDrawer({ filters, mechanics }: DetailDrawerProps) {
     fromDate: filters.fromDate,
     toDate: filters.toDate,
     periodMode: "daily",
-    exportMode: "summary",
     mechanicId: filters.drawerMechanicId,
   });
   const mechanicName =
@@ -82,12 +70,6 @@ export async function DetailDrawer({ filters, mechanics }: DetailDrawerProps) {
   const fulfillmentPct = totalTarget > 0 ? totalHours / totalTarget : 0;
   const closeHref = buildReportsHref(filters, {
     drawerMechanicId: undefined,
-  });
-  const detailedHref = buildReportsHref(filters, {
-    drawerMechanicId: undefined,
-    mechanicIds: [filters.drawerMechanicId],
-    page: 1,
-    view: "detailed",
   });
 
   return (
@@ -157,10 +139,6 @@ export async function DetailDrawer({ filters, mechanics }: DetailDrawerProps) {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          <div className="inline-links">
-            <Link href={detailedHref}>Se alle ticketlinjer</Link>
           </div>
         </div>
       </aside>
