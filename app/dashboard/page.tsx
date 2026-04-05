@@ -142,7 +142,7 @@ export default async function DashboardPage() {
                       </div>
                       <div
                         className="bar-value-overlay"
-                        style={{ bottom: `calc(${fillRatio}% + 10px)` }}
+                        style={{ bottom: `calc(${targetRatio}% + 10px)` }}
                       >
                         {formatHours(row.hours)}
                       </div>
