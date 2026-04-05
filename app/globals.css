@@ -307,15 +307,15 @@ select {
   background: rgba(255, 253, 248, 0.9);
   border: 1px solid rgba(23, 34, 31, 0.08);
   box-shadow: var(--shadow);
-  padding: 24px 24px 30px;
+  padding: 20px 24px 16px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 .dashboard-header h1 {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
   font-family: Georgia, "Times New Roman", serif;
 }
 
@@ -342,16 +342,16 @@ select {
       rgba(23, 34, 31, 0.08) 20%
     );
   border: 1px solid var(--line);
-  padding: 56px 28px 24px;
+  padding: 48px 36px 12px;
   overflow: hidden;
 }
 
 .bars {
   height: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   align-items: end;
-  gap: 18px;
+  gap: 36px;
 }
 
 .chart-target-note {
@@ -975,7 +975,7 @@ tr:last-child td {
 }
 
 .dashboard-header h1 {
-  font-size: clamp(2.5rem, 5vw, 3.75rem);
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
 }
 
 .bar-value {

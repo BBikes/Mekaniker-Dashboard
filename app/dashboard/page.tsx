@@ -117,7 +117,7 @@ export default async function DashboardPage() {
         <header className="dashboard-header">
           <div>
             <p className="eyebrow">TV-visning</p>
-            <h1>Dagens registrerede arbejdstid</h1>
+            <h1>Registreret arbejdstid</h1>
           </div>
           <div className="dashboard-meta">
             <p>{todayLabel}</p>
