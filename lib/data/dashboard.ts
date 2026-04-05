@@ -9,11 +9,60 @@ type TotalRow = {
   quarters_total: number;
 };
 
+export type DashboardLatestSync = {
+  finishedAt: string | null;
+  status: string;
+  mode: string;
+  message: string | null;
+  refreshToken: string | null;
+};
+
+function toLatestSync(row: {
+  finished_at?: string | null;
+  status?: string | null;
+  sync_type?: string | null;
+  message?: string | null;
+} | null): DashboardLatestSync | null {
+  if (!row) {
+    return null;
+  }
+
+  const finishedAt = row.finished_at ?? null;
+  const status = row.status ?? "unknown";
+  const mode = row.sync_type ?? "unknown";
+  const message = row.message ?? null;
+
+  return {
+    finishedAt,
+    status,
+    mode,
+    message,
+    refreshToken: finishedAt ? `${mode}:${status}:${finishedAt}` : `${mode}:${status}:pending`,
+  };
+}
+
+export async function getLatestDashboardSync() {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("sync_event_log")
+    .select("finished_at, status, sync_type, message")
+    .eq("sync_type", "sync")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load latest sync: ${error.message}`);
+  }
+
+  return toLatestSync(data);
+}
+
 export async function getDashboardData() {
   const supabase = createAdminClient();
   const statDate = getCopenhagenDateString();
 
-  const [{ data: mappings, error: mappingsError }, { data: totals, error: totalsError }, { data: latestSync, error: syncError }] =
+  const [{ data: mappings, error: mappingsError }, { data: totals, error: totalsError }, latestSync] =
     await Promise.all([
       supabase
         .from("mechanic_item_mapping")
@@ -25,13 +74,7 @@ export async function getDashboardData() {
         .from("daily_mechanic_totals")
         .select("mechanic_id, hours_total, quarters_total")
         .eq("stat_date", statDate),
-      supabase
-        .from("sync_event_log")
-        .select("finished_at, status, sync_type, message")
-        .in("sync_type", ["baseline", "sync"])
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      getLatestDashboardSync(),
     ]);
 
   if (mappingsError) {
@@ -40,10 +83,6 @@ export async function getDashboardData() {
 
   if (totalsError) {
     throw new Error(`Failed to load dashboard totals: ${totalsError.message}`);
-  }
-
-  if (syncError) {
-    throw new Error(`Failed to load latest sync: ${syncError.message}`);
   }
 
   const totalsByMechanic = new Map((totals ?? []).map((row) => [row.mechanic_id as string, row as TotalRow]));
@@ -62,13 +101,6 @@ export async function getDashboardData() {
     statDate,
     statDateLabel: formatCopenhagenDate(statDate),
     rows,
-    latestSync: latestSync
-      ? {
-          finishedAt: latestSync.finished_at as string | null,
-          status: latestSync.status as string,
-          mode: latestSync.sync_type as string,
-          message: latestSync.message as string | null,
-        }
-      : null,
+    latestSync,
   };
 }
