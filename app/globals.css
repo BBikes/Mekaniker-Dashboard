@@ -338,30 +338,20 @@ select {
   overflow: hidden;
 }
 
-.target-line {
-  position: absolute;
-  left: 28px;
-  right: 28px;
-  border-top: 3px dashed var(--target);
-  z-index: 2;
-}
-
-.target-line span {
-  position: absolute;
-  right: 0;
-  top: -18px;
-  background: var(--surface-strong);
-  color: var(--target);
-  font-weight: 700;
-  padding: 0 8px;
-}
-
 .bars {
   height: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   align-items: end;
   gap: 18px;
+}
+
+.chart-target-note {
+  margin: 0 0 10px;
+  text-align: right;
+  color: var(--target);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .bar-card {

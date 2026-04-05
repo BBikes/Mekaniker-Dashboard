@@ -77,10 +77,10 @@ export default async function DashboardPage() {
 
         <section className="chart-shell">
           {uniformTargetHours !== null ? (
-            <div className="target-line" style={{ bottom: `${clampRatio(uniformTargetHours)}%` }}>
-              <span>Mål {formatHours(uniformTargetHours)}</span>
-            </div>
-          ) : null}
+            <p className="chart-target-note">Fælles mål {formatHours(uniformTargetHours)} af 10,0 t</p>
+          ) : (
+            <p className="chart-target-note">Individuelle dagsmål vises under hver mekaniker</p>
+          )}
 
           <div className="bars">
             {dashboard.rows.length > 0 ? (
@@ -95,9 +95,7 @@ export default async function DashboardPage() {
                   <article className="bar-card" key={row.id}>
                     <div className="bar-value">{formatHours(row.hours)}</div>
                     <div className="bar-track">
-                      {uniformTargetHours === null ? (
-                        <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
-                      ) : null}
+                      <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
                       <div
                         className={`bar-fill ${isAtOrAboveTarget ? "bar-fill--met" : "bar-fill--under"}`}
                         style={{ height: `${fillRatio}%` }}
