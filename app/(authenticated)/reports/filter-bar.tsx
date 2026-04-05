@@ -30,6 +30,14 @@ type FilterBarProps = {
 };
 
 export function FilterBar({ exportHref, filters, mechanics, presets, resetHref }: FilterBarProps) {
+  const selectedMechanics = mechanics.filter((mechanic) => filters.mechanicIds.includes(mechanic.id));
+  const mechanicSummary =
+    selectedMechanics.length === 0
+      ? "Alle mekanikere"
+      : selectedMechanics.length <= 2
+        ? selectedMechanics.map((mechanic) => mechanic.mechanicName).join(", ")
+        : `${selectedMechanics.length} mekanikere valgt`;
+
   return (
     <section className="panel admin-grid">
       <div className="chip-row">
@@ -76,14 +84,25 @@ export function FilterBar({ exportHref, filters, mechanics, presets, resetHref }
           </div>
 
           <div className="field">
-            <label htmlFor="mechanicIds">Mekaniker</label>
-            <select defaultValue={filters.mechanicIds} id="mechanicIds" multiple name="mechanicIds" size={5}>
-              {mechanics.map((mechanic) => (
-                <option key={mechanic.id} value={mechanic.id}>
-                  {mechanic.mechanicName}
-                </option>
-              ))}
-            </select>
+            <label>Mekaniker</label>
+            <details className="dropdown-field">
+              <summary className="dropdown-field__summary">{mechanicSummary}</summary>
+              <div className="dropdown-field__menu">
+                <div className="dropdown-field__list">
+                  {mechanics.map((mechanic) => (
+                    <label className="dropdown-option" key={mechanic.id}>
+                      <input
+                        defaultChecked={filters.mechanicIds.includes(mechanic.id)}
+                        name="mechanicIds"
+                        type="checkbox"
+                        value={mechanic.id}
+                      />
+                      <span>{mechanic.mechanicName}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
           </div>
 
           <div className="field">
