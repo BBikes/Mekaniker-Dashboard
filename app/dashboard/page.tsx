@@ -116,7 +116,7 @@ export default async function DashboardPage() {
           </div>
           <div className="dashboard-meta">
             <p>{todayLabel}</p>
-            <p className="muted">Opdaterer automatisk efter ny sync · Sidst opdateret {lastUpdatedLabel}</p>
+            <p className="muted">Sidst opdateret {lastUpdatedLabel}</p>
           </div>
         </header>
 
