@@ -1,13 +1,13 @@
 import type { KpiSnapshot } from "@/lib/data/reports";
 import { formatDecimal, formatHours, formatInteger, formatPercent } from "@/lib/time";
 
+import { getFulfillmentStyle } from "./fulfillment-color";
+
 type KpiRowProps = {
   kpis: KpiSnapshot;
 };
 
 export function KpiRow({ kpis }: KpiRowProps) {
-  const fulfillmentAlert = kpis.fulfillmentPct < 0.8 || kpis.fulfillmentPct > 1;
-
   return (
     <section className="panel-grid panel-grid--metrics">
       <article className="panel">
@@ -27,7 +27,9 @@ export function KpiRow({ kpis }: KpiRowProps) {
 
       <article className="panel">
         <p className="eyebrow">Opfyldelse</p>
-        <p className={`metric${fulfillmentAlert ? " metric--alert" : ""}`}>{formatPercent(kpis.fulfillmentPct)}</p>
+        <p className="metric" style={getFulfillmentStyle(kpis.fulfillmentPct)}>
+          {formatPercent(kpis.fulfillmentPct)}
+        </p>
       </article>
 
       <article className="panel">

@@ -140,40 +140,6 @@ export default async function HomePage() {
         ) : null}
 
         <section className="panel-grid panel-grid--features">
-          <section className="panel panel--status">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Miljø</p>
-                <h2>Driftsklar status</h2>
-              </div>
-            </div>
-            <div className="status-groups">
-              {groups.map((group) => (
-                <section className="status-group" key={group.title}>
-                  <div className="status-group__header">
-                    <div>
-                      <h3 className="status-group__title">{group.title}</h3>
-                      <p className="muted status-note">{group.summary}</p>
-                    </div>
-                    <span className={`pill ${group.ready ? "pill--ok" : "pill--missing"}`}>
-                      {group.ready ? "Klar" : "Mangler"}
-                    </span>
-                  </div>
-                  <div className="status-list">
-                    {group.rows.map((row) => (
-                      <div className="status-item" key={row.label}>
-                        <span className="status-item__label">{row.label}</span>
-                        <span className={`pill ${row.present ? "pill--ok" : "pill--missing"}`}>
-                          {row.present ? "Til stede" : "Mangler"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </section>
-
           <section className="panel panel--link">
             <div className="panel__header">
               <div>
@@ -217,6 +183,40 @@ export default async function HomePage() {
         </section>
 
         <InternalActions disabledReason={syncReadinessMessage} syncReady={env.syncReady} />
+
+        <section className="panel panel--status admin-grid">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">Miljø</p>
+              <h2>Driftsklar status</h2>
+            </div>
+          </div>
+          <div className="status-groups">
+            {groups.map((group) => (
+              <section className="status-group" key={group.title}>
+                <div className="status-group__header">
+                  <div>
+                    <h3 className="status-group__title">{group.title}</h3>
+                    <p className="muted status-note">{group.summary}</p>
+                  </div>
+                  <span className={`pill ${group.ready ? "pill--ok" : "pill--missing"}`}>
+                    {group.ready ? "Klar" : "Mangler"}
+                  </span>
+                </div>
+                <div className="status-list">
+                  {group.rows.map((row) => (
+                    <div className="status-item" key={row.label}>
+                      <span className="status-item__label">{row.label}</span>
+                      <span className={`pill ${row.present ? "pill--ok" : "pill--missing"}`}>
+                        {row.present ? "Til stede" : "Mangler"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </section>
       </main>
     </>
   );

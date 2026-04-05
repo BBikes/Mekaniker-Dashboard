@@ -42,7 +42,7 @@ type ReportsPageFilters = {
   view: ExportMode;
 };
 
-const SUMMARY_SORTS = new Set(["mechanic", "quarters", "hours", "target", "variance", "pct", "days", "tickets", "avgDay", "avgTicket"]);
+const SUMMARY_SORTS = new Set(["mechanic", "quarters", "hours", "target", "variance", "pct", "tickets", "avgDay", "avgTicket"]);
 const DETAILED_SORTS = new Set(["date", "mechanic", "ticket", "item", "baseline", "current", "added", "hours", "paid", "updated", "anomaly"]);
 
 function readFirstParam(value: SearchParamsValue): string | undefined {

@@ -143,6 +143,10 @@ export function DetailedTable({ filters, pageData }: DetailedTableProps) {
   const end = total === 0 ? 0 : start + rows.length - 1;
   const hasPreviousPage = filters.page > 1;
   const hasNextPage = filters.page * filters.pageSize < total;
+  const summaryHref = buildReportsHref(filters, {
+    page: 1,
+    view: "summary",
+  });
 
   return (
     <section className="panel admin-grid">
@@ -151,74 +155,79 @@ export function DetailedTable({ filters, pageData }: DetailedTableProps) {
           <p className="eyebrow">Detaljeret visning</p>
           <h2>Ticketlinjer i perioden</h2>
         </div>
-        <p className="muted">Status- og søgefiltre gælder kun de detaljerede rækker og CSV-eksporten.</p>
+        <div className="panel__aside">
+          <Link className="button button--ghost" href={summaryHref}>
+            Tilbage til oversigt
+          </Link>
+          <p className="muted">Status- og søgefiltre gælder kun de detaljerede rækker og CSV-eksporten.</p>
+        </div>
       </div>
 
-      <div className="table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>
-                <SortHeader filters={filters} label="Dato" sortKey="date" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Mekaniker" sortKey="mechanic" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Ticket-ID" sortKey="ticket" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Varenummer" sortKey="item" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Baseline (kv)" sortKey="baseline" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Aktuel (kv)" sortKey="current" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Tilføjet (kv)" sortKey="added" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Timer" sortKey="hours" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Låst" sortKey="paid" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Opdateret" sortKey="updated" />
-              </th>
-              <th>
-                <SortHeader filters={filters} label="Anomali" sortKey="anomaly" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <tr key={`${row.statDate}-${row.ticketMaterialId}`}>
-                  <td>{formatShortCopenhagenDate(row.statDate)}</td>
-                  <td>{row.mechanicName}</td>
-                  <td>{row.ticketId}</td>
-                  <td>{row.mechanicItemNo}</td>
-                  <td>{formatDecimal(row.baselineQuantity)}</td>
-                  <td>{formatDecimal(row.currentQuantity)}</td>
-                  <td>{formatDecimal(row.todayAddedQuantity)}</td>
-                  <td>{formatHours(row.hours)}</td>
-                  <td>{row.paymentId ? <span className="pill pill--paid">Betalt</span> : "-"}</td>
-                  <td>{row.sourceUpdatedAt ? formatCopenhagenTime(row.sourceUpdatedAt) : "-"}</td>
-                  <td>
-                    {row.anomalyCode ? <span className="pill pill--anomaly">{row.anomalyCode}</span> : "-"}
-                  </td>
-                </tr>
-              ))
-            ) : (
+      <div className="table-shell">
+        <div className="table-wrap table-wrap--reports">
+          <table className="admin-table">
+            <thead>
               <tr>
-                <td colSpan={11}>Ingen detaljerede linjer matcher de valgte filtre.</td>
+                <th>
+                  <SortHeader filters={filters} label="Dato" sortKey="date" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Mekaniker" sortKey="mechanic" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Ticket-ID" sortKey="ticket" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Varenummer" sortKey="item" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Baseline (kv)" sortKey="baseline" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Aktuel (kv)" sortKey="current" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Tilføjet (kv)" sortKey="added" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Timer" sortKey="hours" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Låst" sortKey="paid" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Opdateret" sortKey="updated" />
+                </th>
+                <th>
+                  <SortHeader filters={filters} label="Anomali" sortKey="anomaly" />
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.length > 0 ? (
+                rows.map((row) => (
+                  <tr key={`${row.statDate}-${row.ticketMaterialId}`}>
+                    <td>{formatShortCopenhagenDate(row.statDate)}</td>
+                    <td>{row.mechanicName}</td>
+                    <td>{row.ticketId}</td>
+                    <td>{row.mechanicItemNo}</td>
+                    <td>{formatDecimal(row.baselineQuantity)}</td>
+                    <td>{formatDecimal(row.currentQuantity)}</td>
+                    <td>{formatDecimal(row.todayAddedQuantity)}</td>
+                    <td>{formatHours(row.hours)}</td>
+                    <td>{row.paymentId ? <span className="pill pill--paid">Betalt</span> : "-"}</td>
+                    <td>{row.sourceUpdatedAt ? formatCopenhagenTime(row.sourceUpdatedAt) : "-"}</td>
+                    <td>{row.anomalyCode ? <span className="pill pill--anomaly">{row.anomalyCode}</span> : "-"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={11}>Ingen detaljerede linjer matcher de valgte filtre.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="pagination">

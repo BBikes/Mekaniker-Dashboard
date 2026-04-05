@@ -4,6 +4,8 @@ import type { ActiveMechanic, AdminStatus, ExportMode, PeriodMode, SortDirection
 import { getSummaryRows } from "@/lib/data/reports";
 import { formatDecimal, formatHours, formatPercent, formatShortCopenhagenDate } from "@/lib/time";
 
+import { getFulfillmentStyle } from "./fulfillment-color";
+
 type DrawerFilterState = {
   dir: SortDirection;
   drawerMechanicId?: string;
@@ -91,7 +93,7 @@ export async function DetailDrawer({ filters, mechanics }: DetailDrawerProps) {
   return (
     <>
       <Link aria-label="Luk detaljevisning" className="drawer__backdrop" href={closeHref} />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <aside aria-labelledby="drawer-title" aria-modal="true" className="drawer" role="dialog">
         <div className="drawer__body">
           <div className="panel__header">
             <div>
@@ -118,41 +120,43 @@ export async function DetailDrawer({ filters, mechanics }: DetailDrawerProps) {
             </article>
             <article className="panel">
               <p className="eyebrow">Opfyldelse</p>
-              <p className={`metric${fulfillmentPct < 0.8 || fulfillmentPct > 1 ? " metric--alert" : ""}`}>
+              <p className="metric" style={getFulfillmentStyle(fulfillmentPct)}>
                 {formatPercent(fulfillmentPct)}
               </p>
             </article>
           </div>
 
-          <div className="table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Dato</th>
-                  <th>Kvarterer</th>
-                  <th>Timer</th>
-                  <th>Mål</th>
-                  <th>Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length > 0 ? (
-                  rows.map((row) => (
-                    <tr key={row.period}>
-                      <td>{formatShortCopenhagenDate(row.period)}</td>
-                      <td>{formatDecimal(row.quarters)}</td>
-                      <td>{formatHours(row.hours)}</td>
-                      <td>{formatHours(row.targetHours)}</td>
-                      <td>{formatHours(row.varianceHours)}</td>
-                    </tr>
-                  ))
-                ) : (
+          <div className="table-shell">
+            <div className="table-wrap table-wrap--reports">
+              <table className="admin-table">
+                <thead>
                   <tr>
-                    <td colSpan={5}>Ingen daglige rækker i den valgte periode.</td>
+                    <th>Dato</th>
+                    <th>Kvarterer</th>
+                    <th>Timer</th>
+                    <th>Mål</th>
+                    <th>Difference</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.length > 0 ? (
+                    rows.map((row) => (
+                      <tr key={row.period}>
+                        <td>{formatShortCopenhagenDate(row.period)}</td>
+                        <td>{formatDecimal(row.quarters)}</td>
+                        <td>{formatHours(row.hours)}</td>
+                        <td>{formatHours(row.targetHours)}</td>
+                        <td>{formatHours(row.varianceHours)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5}>Ingen daglige rækker i den valgte periode.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="inline-links">
