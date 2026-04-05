@@ -339,7 +339,7 @@ select {
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 16%);
   border: 1px solid var(--line);
-  padding: 48px 36px 12px;
+  padding: 32px 36px 60px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -368,10 +368,16 @@ select {
   min-height: 0;
 }
 
-.bar-value {
+.bar-value-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
   text-align: center;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 800;
+  color: #1a2e28;
+  pointer-events: none;
+  z-index: 3;
 }
 
 .bar-track {
@@ -976,8 +982,8 @@ tr:last-child td {
   font-size: clamp(1.8rem, 3.5vw, 2.8rem);
 }
 
-.bar-value {
-  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+.bar-value-overlay {
+  font-size: clamp(1.2rem, 2vw, 1.9rem);
 }
 
 .bar-label {

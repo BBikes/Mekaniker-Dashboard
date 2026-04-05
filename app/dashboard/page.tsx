@@ -105,11 +105,6 @@ export default async function DashboardPage() {
     ? formatCopenhagenTime(dashboard.latestSync.finishedAt)
     : "ikke synkroniseret endnu";
 
-  const defaultTargetHours = dashboard.rows[0]?.targetHours ?? 8;
-  const uniformTargetHours = dashboard.rows.every((row) => Math.abs(row.targetHours - defaultTargetHours) < 0.001)
-    ? defaultTargetHours
-    : null;
-
   return (
     <main className="dashboard-shell">
       <DashboardRefresh initialRefreshToken={dashboard.latestSync?.refreshToken ?? null} />
@@ -126,12 +121,6 @@ export default async function DashboardPage() {
         </header>
 
         <section className="chart-shell">
-          {uniformTargetHours !== null ? (
-            <p className="chart-target-note">Fælles mål {formatHours(uniformTargetHours)} af 10,0 t</p>
-          ) : (
-            <p className="chart-target-note">Individuelle dagsmål vises under hver mekaniker</p>
-          )}
-
           <div className="bars">
             {dashboard.rows.length > 0 ? (
               dashboard.rows.map((row) => {
@@ -143,7 +132,6 @@ export default async function DashboardPage() {
 
                 return (
                   <article className="bar-card" key={row.id}>
-                    <div className="bar-value">{formatHours(row.hours)}</div>
                     <div className="bar-track">
                       <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
                       <div
@@ -152,11 +140,14 @@ export default async function DashboardPage() {
                       >
                         {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
                       </div>
+                      <div
+                        className="bar-value-overlay"
+                        style={{ bottom: `calc(${fillRatio}% + 10px)` }}
+                      >
+                        {formatHours(row.hours)}
+                      </div>
                     </div>
                     <div className="bar-label">{row.mechanicName}</div>
-                    {uniformTargetHours === null ? (
-                      <div className="bar-target-copy">Mål {formatHours(targetHours)}</div>
-                    ) : null}
                   </article>
                 );
               })
