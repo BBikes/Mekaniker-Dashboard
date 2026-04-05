@@ -349,9 +349,9 @@ select {
 .bars {
   height: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   align-items: end;
-  gap: 36px;
+  gap: 72px;
 }
 
 .chart-target-note {
@@ -379,7 +379,7 @@ select {
 .bar-track {
   position: relative;
   flex: 1;
-  min-height: 240px;
+  min-height: 380px;
   border-radius: 18px;
   background: rgba(15, 118, 110, 0.06);
   display: flex;
