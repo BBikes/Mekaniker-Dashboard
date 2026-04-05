@@ -1,93 +1,267 @@
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
+import { DetailDrawer } from "@/app/(authenticated)/reports/detail-drawer";
+import { DetailedTable } from "@/app/(authenticated)/reports/detailed-table";
+import { FilterBar } from "@/app/(authenticated)/reports/filter-bar";
+import { KpiRow } from "@/app/(authenticated)/reports/kpi-row";
+import { SummaryTable } from "@/app/(authenticated)/reports/summary-table";
 import {
   getActiveMechanics,
-  getDetailedRows,
-  getSummaryRows,
+  getAdminSummary,
+  getDetailedPage,
+  getKpiSnapshot,
+  type AdminDetailedFilters,
+  type AdminFilters,
+  type AdminStatus,
   type ExportMode,
   type PeriodMode,
-  type ReportFilters,
+  type SortDirection,
 } from "@/lib/data/reports";
 import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
-import {
-  formatCopenhagenDateTime,
-  formatDecimal,
-  formatHours,
-  formatPercent,
-  formatShortCopenhagenDate,
-  getCopenhagenDateString,
-} from "@/lib/time";
+import { getCopenhagenDateString } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-function getDefaultFilters(params: Record<string, string | string[] | undefined>): ReportFilters {
-  const today = getCopenhagenDateString();
-  const fromDate = typeof params.fromDate === "string" ? params.fromDate : today;
-  const toDate = typeof params.toDate === "string" ? params.toDate : today;
-  const periodMode = typeof params.periodMode === "string" ? (params.periodMode as PeriodMode) : "daily";
-  const exportMode = typeof params.exportMode === "string" ? (params.exportMode as ExportMode) : "summary";
-  const mechanicId = typeof params.mechanicId === "string" && params.mechanicId.length > 0 ? params.mechanicId : undefined;
+type SearchParamsValue = string | string[] | undefined;
 
-  return { fromDate, toDate, periodMode, exportMode, mechanicId };
-}
+type ReportsSearchParams = Record<string, SearchParamsValue>;
 
-function buildQuery(filters: ReportFilters) {
-  const params = new URLSearchParams({
-    fromDate: filters.fromDate,
-    toDate: filters.toDate,
-    periodMode: filters.periodMode,
-    exportMode: filters.exportMode,
-  });
+type ReportsPageFilters = {
+  dir: SortDirection;
+  drawerMechanicId?: string;
+  fromDate: string;
+  mechanicIds: string[];
+  page: number;
+  pageSize: number;
+  periodMode: PeriodMode;
+  q: string;
+  sort: string;
+  status: AdminStatus;
+  toDate: string;
+  view: ExportMode;
+};
 
-  if (filters.mechanicId) {
-    params.set("mechanicId", filters.mechanicId);
+const SUMMARY_SORTS = new Set(["mechanic", "quarters", "hours", "target", "variance", "pct", "days", "tickets", "avgDay", "avgTicket"]);
+const DETAILED_SORTS = new Set(["date", "mechanic", "ticket", "item", "baseline", "current", "added", "hours", "paid", "updated", "anomaly"]);
+
+function readFirstParam(value: SearchParamsValue): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
   }
 
-  return params.toString();
+  return typeof value === "string" ? value : undefined;
 }
 
-function buildPresetHref(filters: ReportFilters, fromDate: string, toDate: string) {
-  return `/reports?${buildQuery({ ...filters, fromDate, toDate })}`;
+function readManyParams(value: SearchParamsValue): string[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return typeof value === "string" ? [value] : [];
 }
 
-function buildExportHref(filters: ReportFilters) {
-  return `/api/reports/export?${buildQuery(filters)}`;
+function parseMechanicIds(params: ReportsSearchParams): string[] {
+  const repeated = readManyParams(params.mechanicIds);
+  const fallback = readFirstParam(params.mechanicId);
+  const rawValues = repeated.length > 0 ? repeated : fallback ? [fallback] : [];
+
+  return [...new Set(rawValues.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean))];
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
+}
+
+function getDefaultDirection(view: ExportMode, sort: string): SortDirection {
+  if (view === "summary") {
+    return sort === "mechanic" ? "asc" : "desc";
+  }
+
+  if (sort === "mechanic" || sort === "item" || sort === "ticket" || sort === "anomaly") {
+    return "asc";
+  }
+
+  return "desc";
+}
+
+function parseFilters(params: ReportsSearchParams): ReportsPageFilters {
+  const today = getCopenhagenDateString();
+  const fromDate = readFirstParam(params.fromDate) ?? today;
+  const toDate = readFirstParam(params.toDate) ?? today;
+  const periodModeValue = readFirstParam(params.periodMode);
+  const periodMode: PeriodMode =
+    periodModeValue === "weekly_avg" || periodModeValue === "monthly_avg" || periodModeValue === "daily"
+      ? periodModeValue
+      : "daily";
+  const viewValue = readFirstParam(params.view) ?? readFirstParam(params.exportMode);
+  const view: ExportMode = viewValue === "detailed" ? "detailed" : "summary";
+  const statusValue = readFirstParam(params.status);
+  const status: AdminStatus =
+    statusValue === "paid" || statusValue === "open" || statusValue === "anomaly" || statusValue === "all"
+      ? statusValue
+      : "all";
+  const mechanicIds = parseMechanicIds(params);
+  const pageSizeRaw = parsePositiveInt(readFirstParam(params.pageSize), 50);
+  const pageSize = pageSizeRaw === 25 || pageSizeRaw === 50 || pageSizeRaw === 100 || pageSizeRaw === 200 ? pageSizeRaw : 50;
+  const q = readFirstParam(params.q)?.trim() ?? "";
+  const drawerMechanicId = readFirstParam(params.drawerMechanicId) || undefined;
+  const allowedSorts = view === "summary" ? SUMMARY_SORTS : DETAILED_SORTS;
+  const sortValue = readFirstParam(params.sort);
+  const sort = sortValue && allowedSorts.has(sortValue) ? sortValue : view === "summary" ? "hours" : "date";
+  const dirValue = readFirstParam(params.dir);
+  const dir = dirValue === "asc" || dirValue === "desc" ? dirValue : getDefaultDirection(view, sort);
+
+  return {
+    dir,
+    drawerMechanicId,
+    fromDate,
+    mechanicIds,
+    page: parsePositiveInt(readFirstParam(params.page), 1),
+    pageSize,
+    periodMode,
+    q,
+    sort,
+    status,
+    toDate,
+    view,
+  };
+}
+
+function buildReportsHref(filters: ReportsPageFilters, overrides: Partial<ReportsPageFilters> = {}) {
+  const next = {
+    ...filters,
+    ...overrides,
+  };
+  const params = new URLSearchParams({
+    fromDate: next.fromDate,
+    toDate: next.toDate,
+    periodMode: next.periodMode,
+    view: next.view,
+    sort: next.sort,
+    dir: next.dir,
+    page: String(next.page),
+    pageSize: String(next.pageSize),
+  });
+
+  if (next.mechanicIds.length > 0) {
+    params.set("mechanicIds", next.mechanicIds.join(","));
+  }
+
+  if (next.status !== "all") {
+    params.set("status", next.status);
+  }
+
+  if (next.q) {
+    params.set("q", next.q);
+  }
+
+  if (next.drawerMechanicId) {
+    params.set("drawerMechanicId", next.drawerMechanicId);
+  }
+
+  return `/reports?${params.toString()}`;
+}
+
+function buildExportHref(filters: ReportsPageFilters, overrides: Partial<ReportsPageFilters> = {}) {
+  const next = {
+    ...filters,
+    ...overrides,
+  };
+  const params = new URLSearchParams({
+    fromDate: next.fromDate,
+    toDate: next.toDate,
+    periodMode: next.periodMode,
+    view: next.view,
+    sort: next.sort,
+    dir: next.dir,
+  });
+
+  if (next.mechanicIds.length > 0) {
+    params.set("mechanicIds", next.mechanicIds.join(","));
+  }
+
+  if (next.status !== "all") {
+    params.set("status", next.status);
+  }
+
+  if (next.q) {
+    params.set("q", next.q);
+  }
+
+  return `/api/reports/export?${params.toString()}`;
 }
 
 function getQuickPresets() {
   const today = getCopenhagenDateString();
-  const now = new Date(`${today}T12:00:00Z`);
-  const monday = new Date(now);
+  const current = new Date(`${today}T12:00:00Z`);
+  const yesterday = new Date(current);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+  const monday = new Date(current);
   const day = (monday.getUTCDay() + 6) % 7;
   monday.setUTCDate(monday.getUTCDate() - day);
 
   const sunday = new Date(monday);
   sunday.setUTCDate(sunday.getUTCDate() + 6);
 
-  const firstOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const lastOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
-  const firstOfPrevMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  const lastOfPrevMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+  const lastWeekStart = new Date(monday);
+  lastWeekStart.setUTCDate(lastWeekStart.getUTCDate() - 7);
 
-  const iso = (value: Date) => value.toISOString().slice(0, 10);
+  const lastWeekEnd = new Date(monday);
+  lastWeekEnd.setUTCDate(lastWeekEnd.getUTCDate() - 1);
+
+  const firstOfMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 1));
+  const lastOfMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0));
+  const firstOfPreviousMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1));
+  const lastOfPreviousMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 0));
+
+  const lastThirtyStart = new Date(current);
+  lastThirtyStart.setUTCDate(lastThirtyStart.getUTCDate() - 29);
+
+  const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 
   return [
     { label: "I dag", from: today, to: today },
-    { label: "Denne uge", from: iso(monday), to: iso(sunday) },
-    { label: "Denne måned", from: iso(firstOfMonth), to: iso(lastOfMonth) },
-    { label: "Sidste måned", from: iso(firstOfPrevMonth), to: iso(lastOfPrevMonth) },
+    { label: "I går", from: toIsoDate(yesterday), to: toIsoDate(yesterday) },
+    { label: "Denne uge", from: toIsoDate(monday), to: toIsoDate(sunday) },
+    { label: "Sidste uge", from: toIsoDate(lastWeekStart), to: toIsoDate(lastWeekEnd) },
+    { label: "Denne måned", from: toIsoDate(firstOfMonth), to: toIsoDate(lastOfMonth) },
+    { label: "Sidste måned", from: toIsoDate(firstOfPreviousMonth), to: toIsoDate(lastOfPreviousMonth) },
+    { label: "Sidste 30 dage", from: toIsoDate(lastThirtyStart), to: today },
   ];
 }
 
-function formatPeriodLabel(period: string, mode: PeriodMode) {
-  return mode === "daily" ? formatShortCopenhagenDate(period) : period;
+function toAdminFilters(filters: ReportsPageFilters): AdminFilters {
+  return {
+    dir: filters.dir,
+    fromDate: filters.fromDate,
+    mechanicIds: filters.mechanicIds,
+    periodMode: filters.periodMode,
+    q: filters.q,
+    sort: filters.sort,
+    toDate: filters.toDate,
+  };
+}
+
+function toDetailedFilters(filters: ReportsPageFilters): AdminDetailedFilters {
+  return {
+    ...toAdminFilters(filters),
+    page: filters.page,
+    pageSize: filters.pageSize,
+    status: filters.status,
+  };
 }
 
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<ReportsSearchParams>;
 }) {
   const env = getEnvPresence();
 
@@ -109,15 +283,56 @@ export default async function ReportsPage({
     );
   }
 
-  const params = await searchParams;
-  const filters = getDefaultFilters(params);
-  const presets = getQuickPresets();
+  const filters = parseFilters(await searchParams);
+  const presets = getQuickPresets().map((preset) => ({
+    active: filters.fromDate === preset.from && filters.toDate === preset.to,
+    href: buildReportsHref(filters, {
+      drawerMechanicId: undefined,
+      fromDate: preset.from,
+      page: 1,
+      toDate: preset.to,
+    }),
+    label: preset.label,
+  }));
+  const exportHref = buildExportHref(filters);
 
   try {
-    const [mechanics, summaryRows, detailedRows] = await Promise.all([
+    if (filters.view === "summary") {
+      const adminFilters = toAdminFilters(filters);
+      const [mechanics, kpis, rows] = await Promise.all([
+        getActiveMechanics(),
+        getKpiSnapshot(adminFilters),
+        getAdminSummary(adminFilters),
+      ]);
+
+      return (
+        <>
+          <AppHeader activeHref="/reports" />
+          <main className="page-shell">
+            <section className="hero">
+              <div className="hero__top">
+                <div>
+                  <p className="eyebrow">Rapportering</p>
+                  <h1>Admin-panel for værkstedsdata</h1>
+                </div>
+              </div>
+              <p>Filtrér historik, gennemse performance pr. mekaniker og eksportér CSV uden at røre TV-dashboardet.</p>
+            </section>
+
+            <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
+            <KpiRow kpis={kpis} />
+            <SummaryTable filters={filters} rows={rows} />
+            <DetailDrawer filters={filters} mechanics={mechanics} />
+          </main>
+        </>
+      );
+    }
+
+    const adminFilters = toAdminFilters(filters);
+    const [mechanics, kpis, pageData] = await Promise.all([
       getActiveMechanics(),
-      getSummaryRows(filters),
-      filters.exportMode === "detailed" ? getDetailedRows(filters) : Promise.resolve([]),
+      getKpiSnapshot(adminFilters),
+      getDetailedPage(toDetailedFilters(filters)),
     ]);
 
     return (
@@ -128,158 +343,16 @@ export default async function ReportsPage({
             <div className="hero__top">
               <div>
                 <p className="eyebrow">Rapportering</p>
-                <h1>Rapporter og eksport</h1>
+                <h1>Admin-panel for værkstedsdata</h1>
               </div>
             </div>
-            <p>Filtrér data, gennemse tabellen og eksportér summeret eller detaljeret CSV til Excel.</p>
+            <p>Filtrér historik, søg på ticketlinjer og eksportér præcist det samme udsnit, som tabellen viser.</p>
           </section>
 
-          <section className="panel">
-            <div className="chip-row">
-              {presets.map((preset) => {
-                const isActive = filters.fromDate === preset.from && filters.toDate === preset.to;
-
-                return (
-                  <Link
-                    className={`chip${isActive ? " is-active" : ""}`}
-                    href={buildPresetHref(filters, preset.from, preset.to)}
-                    key={preset.label}
-                  >
-                    {preset.label}
-                  </Link>
-                );
-              })}
-            </div>
-
-            <form method="GET">
-              <div className="reports-toolbar">
-                <div className="field">
-                  <label htmlFor="fromDate">Fra</label>
-                  <input defaultValue={filters.fromDate} id="fromDate" name="fromDate" type="date" />
-                </div>
-                <div className="field">
-                  <label htmlFor="toDate">Til</label>
-                  <input defaultValue={filters.toDate} id="toDate" name="toDate" type="date" />
-                </div>
-                <div className="field">
-                  <label htmlFor="periodMode">Periode</label>
-                  <select defaultValue={filters.periodMode} id="periodMode" name="periodMode">
-                    <option value="daily">Dagligt</option>
-                    <option value="weekly_avg">Ugentligt snit</option>
-                    <option value="monthly_avg">Månedligt snit</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="exportMode">Visning</label>
-                  <select defaultValue={filters.exportMode} id="exportMode" name="exportMode">
-                    <option value="summary">Summeret</option>
-                    <option value="detailed">Detaljeret</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label htmlFor="mechanicId">Mekaniker</label>
-                  <select defaultValue={filters.mechanicId ?? ""} id="mechanicId" name="mechanicId">
-                    <option value="">Alle mekanikere</option>
-                    {mechanics.map((mechanic) => (
-                      <option key={mechanic.id} value={mechanic.id}>
-                        {mechanic.mechanicName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="toolbar-actions">
-                <button className="button button--accent" type="submit">
-                  Opdater
-                </button>
-                <Link className="button button--ghost" href={buildExportHref(filters)}>
-                  Eksportér CSV
-                </Link>
-              </div>
-            </form>
-
-            <div className="table-wrap">
-              {filters.exportMode === "summary" ? (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Periode</th>
-                      <th>Mekaniker</th>
-                      <th>Kvarterer</th>
-                      <th>Timer</th>
-                      <th>Mål</th>
-                      <th>Opfyldelse</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summaryRows.length > 0 ? (
-                      summaryRows.map((row) => {
-                        const ratio = row.targetHours > 0 ? row.hours / row.targetHours : 0;
-                        return (
-                          <tr key={`${row.period}-${row.mechanicName}`}>
-                            <td>{formatPeriodLabel(row.period, filters.periodMode)}</td>
-                            <td>{row.mechanicName}</td>
-                            <td>{formatDecimal(row.quarters)}</td>
-                            <td>{formatHours(row.hours)}</td>
-                            <td>{formatHours(row.targetHours)}</td>
-                            <td>{formatPercent(ratio)}</td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={6}>Ingen data i det valgte tidsrum.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              ) : (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Dato</th>
-                      <th>Mekaniker</th>
-                      <th>Ticket</th>
-                      <th>Linje-ID</th>
-                      <th>Varenummer</th>
-                      <th>Baseline</th>
-                      <th>Aktuel</th>
-                      <th>Tilføjet</th>
-                      <th>Timer</th>
-                      <th>Betaling</th>
-                      <th>Opdateret</th>
-                      <th>Anomali</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailedRows.length > 0 ? (
-                      detailedRows.map((row) => (
-                        <tr key={`${row.statDate}-${row.ticketMaterialId}`}>
-                          <td>{formatShortCopenhagenDate(row.statDate)}</td>
-                          <td>{row.mechanicName}</td>
-                          <td>{row.ticketId}</td>
-                          <td>{row.ticketMaterialId}</td>
-                          <td>{row.mechanicItemNo}</td>
-                          <td>{formatDecimal(row.baselineQuantity)}</td>
-                          <td>{formatDecimal(row.currentQuantity)}</td>
-                          <td>{formatDecimal(row.todayAddedQuantity)}</td>
-                          <td>{formatHours(row.hours)}</td>
-                          <td>{row.paymentId ?? "-"}</td>
-                          <td>{formatCopenhagenDateTime(row.sourceUpdatedAt)}</td>
-                          <td>{row.anomalyCode ?? "-"}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={12}>Ingen data i det valgte tidsrum.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </section>
+          <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
+          <KpiRow kpis={kpis} />
+          <DetailedTable filters={filters} pageData={pageData} />
+          <DetailDrawer filters={filters} mechanics={mechanics} />
         </main>
       </>
     );
