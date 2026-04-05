@@ -297,20 +297,24 @@ select {
 }
 
 .dashboard-shell {
-  min-height: 100vh;
+  height: 100vh;
   padding: 24px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .dashboard-card {
-  min-height: calc(100vh - 48px);
+  height: 100%;
   border-radius: 28px;
   background: rgba(255, 253, 248, 0.9);
   border: 1px solid rgba(23, 34, 31, 0.08);
   box-shadow: var(--shadow);
   padding: 20px 24px 16px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 
 .dashboard-header h1 {
@@ -331,18 +335,12 @@ select {
 .chart-shell {
   position: relative;
   flex: 1;
+  min-height: 0;
   border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 16%),
-    repeating-linear-gradient(
-      to top,
-      transparent 0,
-      transparent calc(20% - 1px),
-      rgba(23, 34, 31, 0.08) calc(20% - 1px),
-      rgba(23, 34, 31, 0.08) 20%
-    );
+  background: linear-gradient(180deg, rgba(15, 118, 110, 0.06), transparent 16%);
   border: 1px solid var(--line);
   padding: 48px 36px 12px;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -350,7 +348,7 @@ select {
   height: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  align-items: end;
+  align-items: stretch;
   gap: 72px;
 }
 
@@ -365,9 +363,9 @@ select {
 .bar-card {
   display: flex;
   flex-direction: column;
-  justify-content: end;
+  justify-content: flex-end;
   gap: 12px;
-  height: 100%;
+  min-height: 0;
 }
 
 .bar-value {
@@ -379,7 +377,7 @@ select {
 .bar-track {
   position: relative;
   flex: 1;
-  min-height: 380px;
+  min-height: 0;
   border-radius: 18px;
   background: rgba(15, 118, 110, 0.06);
   display: flex;
