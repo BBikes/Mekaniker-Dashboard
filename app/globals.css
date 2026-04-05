@@ -408,15 +408,11 @@ select {
   z-index: 1;
 }
 
-.bar-fill--under {
-  background: linear-gradient(180deg, #fde047 0%, #eab308 100%);
-  color: #2f2500;
-}
-
-.bar-fill--met {
-  background: linear-gradient(180deg, #4ade80 0%, #15803d 100%);
-  color: white;
-}
+/* bar-fill--under og bar-fill--met er beholdt som tomme hooks.
+   Farve og gradient sættes nu via inline style i dashboard/page.tsx
+   baseret på opfyldelsesprocent (0 % = rød, 70 % = gul, 100 %+ = grøn). */
+.bar-fill--under {}
+.bar-fill--met {}
 
 .bar-label {
   text-align: center;
