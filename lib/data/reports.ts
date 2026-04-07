@@ -259,7 +259,8 @@ async function fetchTicketActivityRows(filters: Pick<AdminDetailedFilters, "from
     .from("daily_ticket_item_baselines")
     .select("stat_date, mechanic_id, ticket_id")
     .gte("stat_date", filters.fromDate)
-    .lte("stat_date", filters.toDate);
+    .lte("stat_date", filters.toDate)
+    .neq("today_added_quantity", 0);
 
   if (mechanicIds.length === 1) {
     query = query.eq("mechanic_id", mechanicIds[0]);

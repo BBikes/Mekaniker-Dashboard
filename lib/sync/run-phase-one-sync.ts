@@ -692,21 +692,39 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     if (invisibleRows.length > 0) {
       visibilityAnomalies.push(...invisibleRows.map((row) => row.ticket_material_id));
       anomalyCount += invisibleRows.length;
+      rowsCorrected += invisibleRows.length;
 
-      const { error } = await supabase
-        .from("daily_ticket_item_baselines")
-        .update({
+      const invisibleUpserts = invisibleRows.map((row) => {
+        const baselineQuantity = Number(row.baseline_quantity);
+        const todayAddedQuantity = 0 - baselineQuantity;
+        
+        affectedMechanicIds.add(row.mechanic_id as string);
+
+        return {
+          stat_date: statDate,
+          ticket_material_id: row.ticket_material_id,
+          ticket_id: row.ticket_id,
+          mechanic_id: row.mechanic_id,
+          mechanic_item_no: row.mechanic_item_no,
+          baseline_quantity: roundNumber(baselineQuantity),
+          current_quantity: 0,
+          today_added_quantity: roundNumber(todayAddedQuantity),
+          today_added_hours: roundNumber(todayAddedQuantity * 0.25),
+          source_updated_at: row.source_updated_at,
+          source_payment_id: row.source_payment_id,
+          source_amountpaid: row.source_amountpaid,
+          last_seen_at: now,
           anomaly_code: "missing_in_latest_fetch",
           updated_at: now,
-        })
-        .eq("stat_date", statDate)
-        .in(
-          "ticket_material_id",
-          invisibleRows.map((row) => row.ticket_material_id),
-        );
+        };
+      });
+
+      const { error } = await supabase.from("daily_ticket_item_baselines").upsert(invisibleUpserts, {
+        onConflict: "stat_date,ticket_material_id",
+      });
 
       if (error) {
-        throw new Error(`Failed to flag visibility anomalies: ${error.message}`);
+        throw new Error(`Failed to flag visibility anomalies and update quantities: ${error.message}`);
       }
     }
 
