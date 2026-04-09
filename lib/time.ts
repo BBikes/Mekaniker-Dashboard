@@ -113,6 +113,53 @@ export function getMonthKey(dateString: string) {
   return dateString.slice(0, 7);
 }
 
+export function addDays(dateString: string, days: number): string {
+  const date = new Date(`${dateString}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return dateFormatter.format(date);
+}
+
+export function getStartOfWeek(dateString: string): string {
+  const date = new Date(`${dateString}T12:00:00Z`);
+  const dayNumber = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNumber);
+  return dateFormatter.format(date);
+}
+
+export function getStartOfMonth(dateString: string): string {
+  return `${dateString.slice(0, 7)}-01`;
+}
+
+export function countWeekdaysBetween(fromDate: string, toDate: string): number {
+  if (fromDate > toDate) {
+    return 0;
+  }
+
+  let count = 0;
+  let current = fromDate;
+
+  while (current <= toDate) {
+    const date = new Date(`${current}T12:00:00Z`);
+    const day = date.getUTCDay();
+
+    if (day >= 1 && day <= 5) {
+      count += 1;
+    }
+
+    current = addDays(current, 1);
+  }
+
+  return count;
+}
+
+export function formatShortDateRange(fromDate: string, toDate: string): string {
+  if (fromDate === toDate) {
+    return formatShortCopenhagenDate(fromDate);
+  }
+
+  return `${formatShortCopenhagenDate(fromDate)} - ${formatShortCopenhagenDate(toDate)}`;
+}
+
 export function toIsoTimestamp(date = new Date()) {
   return date.toISOString();
 }

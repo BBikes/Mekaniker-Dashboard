@@ -53,7 +53,7 @@ Aabn:
 - `/` for internt kontrolpanel
 - `/dashboard` for TV-dashboard
 - `/reports` for rapport/export
-- `/settings` for mekaniker-opsaetning
+- `/settings` for mekaniker-opsaetning og TV-board rotation
 
 ## Manuel verificering
 
@@ -61,9 +61,10 @@ Aabn:
 2. Aabn `/`.
 3. Kor `Probe API` for at se live Customers 1st-normalisering.
 4. Aabn `/settings` og opret mekaniker-mappings.
-5. Kor `Opret dagens baseline` en gang ved dagens start hvis du vil teste manuelt.
-6. Kor `Kor sync nu` for at hente aktuelle ticket-material maengder.
-7. Aabn `/dashboard`.
+5. Vaelg hvilke TV-boards der skal vaere aktive, deres raekkefoelge og hvor laenge hvert board skal vises.
+6. Kor `Opret dagens baseline` en gang ved dagens start hvis du vil teste manuelt.
+7. Kor `Kor sync nu` for at hente aktuelle ticket-material maengder.
+8. Aabn `/dashboard`.
 
 ## Noter
 

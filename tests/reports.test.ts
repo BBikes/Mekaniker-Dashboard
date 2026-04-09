@@ -13,6 +13,7 @@ class MockQuery {
     in: [] as Array<[string, string[]]>,
     is: [] as Array<[string, null]>,
     lte: [] as Array<[string, string]>,
+    neq: [] as Array<[string, string | number]>,
     not: [] as Array<[string, string, null]>,
     or: [] as string[],
     order: [] as Array<[string, Record<string, unknown> | undefined]>,
@@ -37,6 +38,11 @@ class MockQuery {
 
   lte(column: string, value: string) {
     this.calls.lte.push([column, value]);
+    return this;
+  }
+
+  neq(column: string, value: string | number) {
+    this.calls.neq.push([column, value]);
     return this;
   }
 

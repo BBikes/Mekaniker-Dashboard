@@ -33,6 +33,13 @@ function readBoolean(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
+function readStringArray(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
+}
+
 function revalidateViews() {
   revalidatePath("/");
   revalidatePath("/reports");
@@ -109,4 +116,40 @@ export async function updateMechanicAction(formData: FormData) {
 
   revalidateViews();
   redirectWithMessage("Mekaniker gemt.", "success");
+}
+
+export async function updateDashboardViewSettingAction(formData: FormData) {
+  const user = await getCurrentUserOrNull();
+  if (!user) {
+    redirect("/login?redirect=/settings");
+  }
+
+  const boardType = readText(formData, "board_type");
+  const displayOrder = readInteger(formData, "display_order", 0);
+  const durationSeconds = Math.max(5, readInteger(formData, "duration_seconds", 20));
+  const active = readBoolean(formData, "active");
+  const selectedMechanicIds = readStringArray(formData, "selected_mechanic_ids");
+
+  if (!boardType) {
+    redirectWithMessage("Dashboard-indstilling kunne ikke gemmes.", "error");
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("dashboard_view_settings")
+    .update({
+      display_order: displayOrder,
+      duration_seconds: durationSeconds,
+      active,
+      selected_mechanic_ids: selectedMechanicIds,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("board_type", boardType);
+
+  if (error) {
+    redirectWithMessage(error.message, "error");
+  }
+
+  revalidateViews();
+  redirectWithMessage("Dashboard-indstilling gemt.", "success");
 }

@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { getMonthKey, getWeekKey } from "@/lib/time";
+import { addDays, countWeekdaysBetween, getMonthKey, getStartOfMonth, getStartOfWeek, getWeekKey } from "@/lib/time";
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/server", () => ({
+  createAdminClient: () => {
+    throw new Error("createAdminClient should not be used in time helper tests.");
+  },
+}));
 
 describe("time helpers", () => {
   it("builds stable ISO week keys", () => {
@@ -10,5 +17,42 @@ describe("time helpers", () => {
 
   it("builds month keys", () => {
     expect(getMonthKey("2026-04-04")).toBe("2026-04");
+  });
+
+  it("builds stable period boundaries", () => {
+    expect(addDays("2026-04-09", -7)).toBe("2026-04-02");
+    expect(getStartOfWeek("2026-04-09")).toBe("2026-04-06");
+    expect(getStartOfMonth("2026-04-09")).toBe("2026-04-01");
+  });
+
+  it("counts weekdays across a date range", () => {
+    expect(countWeekdaysBetween("2026-04-06", "2026-04-12")).toBe(5);
+    expect(countWeekdaysBetween("2026-04-11", "2026-04-12")).toBe(0);
+  });
+});
+
+describe("dashboard windows", () => {
+  it("resolves the configured dashboard periods", async () => {
+    const { getDashboardWindow } = await import("@/lib/data/dashboard");
+
+    expect(getDashboardWindow("today", "2026-04-09")).toMatchObject({
+      fromDate: "2026-04-09",
+      toDate: "2026-04-09",
+    });
+
+    expect(getDashboardWindow("last_week", "2026-04-09")).toMatchObject({
+      fromDate: "2026-04-02",
+      toDate: "2026-04-08",
+    });
+
+    expect(getDashboardWindow("current_week", "2026-04-09")).toMatchObject({
+      fromDate: "2026-04-06",
+      toDate: "2026-04-09",
+    });
+
+    expect(getDashboardWindow("current_month", "2026-04-09")).toMatchObject({
+      fromDate: "2026-04-01",
+      toDate: "2026-04-09",
+    });
   });
 });

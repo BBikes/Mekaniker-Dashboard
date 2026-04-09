@@ -301,10 +301,27 @@ select {
   padding: 24px;
   box-sizing: border-box;
   overflow: hidden;
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  padding: 0 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard-topline__date {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 .dashboard-card {
-  height: 100%;
+  min-height: 0;
   border-radius: 28px;
   background: rgba(255, 253, 248, 0.9);
   border: 1px solid rgba(23, 34, 31, 0.08);
@@ -417,6 +434,91 @@ select {
    baseret på opfyldelsesprocent (0 % = rød, 70 % = gul, 100 %+ = grøn). */
 .bar-fill--under {}
 .bar-fill--met {}
+
+.focus-grid {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.focus-panel {
+  min-height: 0;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.focus-panel h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 2rem);
+}
+
+.focus-bars {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.focus-bar-card {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.focus-bar-label {
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.focus-bar-track {
+  position: relative;
+  min-height: 260px;
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.06);
+  display: flex;
+  align-items: end;
+  overflow: hidden;
+}
+
+.focus-bar-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1a2e28;
+  pointer-events: none;
+  z-index: 3;
+}
+
+@media (max-width: 900px) {
+  .dashboard-shell {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .dashboard-card {
+    min-height: calc(100vh - 110px);
+  }
+
+  .bars {
+    gap: 28px;
+  }
+
+  .focus-bars {
+    grid-template-columns: repeat(3, minmax(72px, 1fr));
+  }
+}
 
 .bar-label {
   text-align: center;

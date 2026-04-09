@@ -1,10 +1,11 @@
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
+import { getDashboardViewSettings } from "@/lib/data/dashboard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 
-import { createMechanicAction, updateMechanicAction } from "./actions";
+import { createMechanicAction, updateDashboardViewSettingAction, updateMechanicAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,21 +43,26 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     display_order: number;
     active: boolean;
   }> = [];
+  let dashboardViews: Awaited<ReturnType<typeof getDashboardViewSettings>> = [];
   let loadError: string | null = null;
 
   try {
     const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("mechanic_item_mapping")
-      .select("id, mechanic_name, mechanic_item_no, daily_target_hours, display_order, active")
-      .order("display_order", { ascending: true })
-      .order("mechanic_name", { ascending: true });
+    const [{ data, error }, views] = await Promise.all([
+      supabase
+        .from("mechanic_item_mapping")
+        .select("id, mechanic_name, mechanic_item_no, daily_target_hours, display_order, active")
+        .order("display_order", { ascending: true })
+        .order("mechanic_name", { ascending: true }),
+      getDashboardViewSettings(),
+    ]);
 
     if (error) {
       throw error;
     }
 
     mechanics = (data ?? []) as typeof mechanics;
+    dashboardViews = views;
   } catch (error) {
     loadError = toOperatorErrorMessage(error, "Kunne ikke hente mekanikeropsætning.");
   }
@@ -69,10 +75,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
           <div className="hero__top">
             <div>
               <p className="eyebrow">Indstillinger</p>
-              <h1>Mekanikere og varenummer</h1>
+              <h1>Mekanikere, mål og TV-boards</h1>
             </div>
           </div>
-          <p>Vedligehold mappings for mekanikere, mål og rækkefølge direkte i appen.</p>
+          <p>Vedligehold mappings for mekanikere og styr hvilke dashboards TV-visningen roterer igennem.</p>
         </section>
 
         {message ? <p className={`flash ${kind === "success" ? "flash--success" : "flash--error"}`}>{message}</p> : null}
@@ -94,6 +100,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
             <div className="field">
               <label htmlFor="new-mechanic-item-no">Varenummer</label>
               <input id="new-mechanic-item-no" name="mechanic_item_no" required type="text" />
+            </div>
+            <div className="field">
+              <label htmlFor="new-daily-target-hours">Mål pr. hverdag (timer)</label>
+              <input defaultValue="7.5" id="new-daily-target-hours" min="0" name="daily_target_hours" step="0.5" type="number" />
             </div>
 
             <div className="field">
@@ -125,6 +135,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   <tr>
                     <th>Navn</th>
                     <th>Varenummer</th>
+                    <th>Mål pr. hverdag</th>
                     <th>Rækkefølge</th>
                     <th>Aktiv</th>
                     <th>Handling</th>
@@ -141,6 +152,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                         </td>
                         <td>
                           <input defaultValue={mechanic.mechanic_item_no} form={formId} name="mechanic_item_no" required type="text" />
+                        </td>
+                        <td>
+                          <input defaultValue={mechanic.daily_target_hours} form={formId} min="0" name="daily_target_hours" step="0.5" type="number" />
                         </td>
 
                         <td>
@@ -165,6 +179,79 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
             </div>
           ) : (
             <p className="muted">Ingen mekanikere endnu. Opret den første mapping ovenfor for at gøre sync og dashboard brugbare.</p>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">TV-dashboard</p>
+              <h2>Boards og rotation</h2>
+            </div>
+            <p className="muted">Aktive boards vises i rækkefølge på TV-siden. Varighed angives i sekunder.</p>
+          </div>
+
+          {dashboardViews.length > 0 ? (
+            <div className="table-wrap">
+              <table className="settings-table">
+                <thead>
+                  <tr>
+                    <th>Board</th>
+                    <th>Varighed (sek.)</th>
+                    <th>Rækkefølge</th>
+                    <th>Aktiv</th>
+                    <th>Valgte mekanikere</th>
+                    <th>Handling</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardViews.map((view) => {
+                    const formId = `dashboard-view-form-${view.boardType}`;
+                    const isFocusBoard = view.boardType === "mechanic_focus";
+
+                    return (
+                      <tr key={view.boardType}>
+                        <td>
+                          <strong>{view.boardTitle}</strong>
+                        </td>
+                        <td>
+                          <input defaultValue={view.durationSeconds} form={formId} min="5" name="duration_seconds" step="1" type="number" />
+                        </td>
+                        <td>
+                          <input defaultValue={view.displayOrder} form={formId} min="0" name="display_order" step="1" type="number" />
+                        </td>
+                        <td>
+                          <input defaultChecked={view.active} form={formId} name="active" type="checkbox" />
+                        </td>
+                        <td>
+                          {isFocusBoard ? (
+                            <select defaultValue={view.selectedMechanicIds} form={formId} multiple name="selected_mechanic_ids" size={Math.min(Math.max(mechanics.length, 3), 6)}>
+                              {mechanics.map((mechanic) => (
+                                <option key={mechanic.id} value={mechanic.id}>
+                                  {mechanic.mechanic_name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="muted">Bruger alle aktive mekanikere</span>
+                          )}
+                        </td>
+                        <td>
+                          <form action={updateDashboardViewSettingAction} id={formId}>
+                            <input name="board_type" type="hidden" value={view.boardType} />
+                            <button className="button button--ghost" type="submit">
+                              Gem
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
           )}
         </section>
       </main>

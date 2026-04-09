@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getLatestDashboardSync } from "@/lib/data/dashboard";
+import { getDashboardPresentation } from "@/lib/data/dashboard";
 import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
@@ -11,11 +11,11 @@ export async function GET() {
     return createUnauthorizedApiResponse();
   }
 
-  const latestSync = await getLatestDashboardSync();
+  const dashboard = await getDashboardPresentation();
 
   return NextResponse.json(
     {
-      latestSync,
+      refreshToken: dashboard.refreshToken,
     },
     {
       headers: {
