@@ -3,7 +3,8 @@ import "server-only";
 import { cache } from "react";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { formatPercent, getMonthKey, getWeekKey } from "@/lib/time";
+import { getDailyTargetHoursForDate, getTargetHoursBetween, getTargetQuartersBetween } from "@/lib/targets";
+import { addDays, formatPercent, getMonthKey, getWeekKey } from "@/lib/time";
 
 export type PeriodMode = "daily" | "weekly_avg" | "monthly_avg";
 export type ExportMode = "summary" | "detailed";
@@ -307,7 +308,11 @@ const loadSummaryDataset = cache(async (serializedFilters: string): Promise<Summ
     toDate: parsed.toDate,
     mechanicIds: parsed.mechanicIds,
   };
-  const [totalsRows, ticketRows] = await Promise.all([fetchTotalsSourceRows(baseFilters), fetchTicketActivityRows(baseFilters)]);
+  const [totalsRows, ticketRows, periodTargetHours] = await Promise.all([
+    fetchTotalsSourceRows(baseFilters),
+    fetchTicketActivityRows(baseFilters),
+    getTargetHoursBetween(parsed.fromDate, parsed.toDate),
+  ]);
   const query = normalizeQuery(parsed.q);
   const filteredTotals = totalsRows.filter((row) => isSummaryMechanicMatch(row.mechanicName, query));
   const aggregates = new Map<
@@ -360,15 +365,17 @@ const loadSummaryDataset = cache(async (serializedFilters: string): Promise<Summ
   const rows = [...aggregates.values()].map((entry) => {
     const tickets = ticketIdsByMechanic.get(entry.mechanicId)?.size ?? 0;
     const workdays = entry.workdays.size;
-    const fulfillmentPct = entry.targetHours > 0 ? entry.hours / entry.targetHours : 0;
+    const targetHours = roundNumber(periodTargetHours);
+    const varianceHours = roundNumber(entry.hours - targetHours);
+    const fulfillmentPct = targetHours > 0 ? entry.hours / targetHours : 0;
 
     return {
       mechanicId: entry.mechanicId,
       mechanicName: entry.mechanicName,
       quarters: roundNumber(entry.quarters),
       hours: roundNumber(entry.hours),
-      targetHours: roundNumber(entry.targetHours),
-      varianceHours: roundNumber(entry.varianceHours),
+      targetHours,
+      varianceHours,
       fulfillmentPct,
       workdays,
       tickets,
@@ -715,14 +722,20 @@ export async function getSummaryRows(filters: ReportFilters): Promise<SummaryRow
   const typedRows = await fetchTotalsSourceRows(filters);
 
   if (filters.periodMode === "daily") {
-    return typedRows.map((row) => ({
-      period: row.statDate,
-      mechanicName: row.mechanicName,
-      quarters: roundNumber(row.quartersTotal),
-      hours: roundNumber(row.hoursTotal),
-      targetHours: roundNumber(row.targetHours),
-      varianceHours: roundNumber(row.varianceHours),
-    }));
+    return Promise.all(
+      typedRows.map(async (row) => {
+        const targetHours = roundNumber(await getDailyTargetHoursForDate(row.statDate));
+
+        return {
+          period: row.statDate,
+          mechanicName: row.mechanicName,
+          quarters: roundNumber(row.quartersTotal),
+          hours: roundNumber(row.hoursTotal),
+          targetHours,
+          varianceHours: roundNumber(row.hoursTotal - targetHours),
+        } satisfies SummaryRow;
+      }),
+    );
   }
 
   const grouped = new Map<
@@ -787,29 +800,31 @@ export async function getCalendarYearOverview(
   const selectedIds = new Set(normalizeMechanicIds(filters));
   const mechanicCount =
     selectedIds.size > 0 ? activeMechanics.filter((mechanic) => selectedIds.has(mechanic.id)).length : activeMechanics.length;
-  const monthly = new Map<string, { targetQuarters: number; registeredQuarters: number }>();
+  const monthly = new Map<string, { registeredQuarters: number }>();
 
   for (const row of totalsRows) {
     const monthKey = getMonthKey(row.statDate);
-    const current = monthly.get(monthKey) ?? { targetQuarters: 0, registeredQuarters: 0 };
+    const current = monthly.get(monthKey) ?? { registeredQuarters: 0 };
 
-    current.targetQuarters += row.targetHours * 4;
     current.registeredQuarters += row.quartersTotal;
     monthly.set(monthKey, current);
   }
 
-  return Array.from({ length: 12 }, (_, monthIndex) => {
+  return Promise.all(Array.from({ length: 12 }, async (_, monthIndex) => {
+    const monthStart = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+    const nextMonthStart = monthIndex === 11 ? `${year + 1}-01-01` : `${year}-${String(monthIndex + 2).padStart(2, "0")}-01`;
     const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-    const current = monthly.get(monthKey) ?? { targetQuarters: 0, registeredQuarters: 0 };
+    const current = monthly.get(monthKey) ?? { registeredQuarters: 0 };
+    const targetQuartersPerMechanic = await getTargetQuartersBetween(monthStart, addDays(nextMonthStart, -1));
 
     return {
       monthKey,
       monthLabel: getMonthLabel(year, monthIndex),
-      targetQuarters: roundNumber(current.targetQuarters),
+      targetQuarters: roundNumber(targetQuartersPerMechanic * mechanicCount),
       registeredQuarters: roundNumber(current.registeredQuarters),
       avgQuartersPerMechanic: mechanicCount > 0 ? roundNumber(current.registeredQuarters / mechanicCount) : 0,
     } satisfies CalendarYearOverviewRow;
-  });
+  }));
 }
 
 export async function getDetailedRows(filters: ReportFilters | AdminDetailedFilters): Promise<DetailedRow[]> {

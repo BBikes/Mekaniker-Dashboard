@@ -41,7 +41,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     id: string;
     mechanic_name: string;
     mechanic_item_no: string;
-    daily_target_hours: number;
     display_order: number;
     active: boolean;
   }> = [];
@@ -53,7 +52,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     const [{ data, error }, views] = await Promise.all([
       supabase
         .from("mechanic_item_mapping")
-        .select("id, mechanic_name, mechanic_item_no, daily_target_hours, display_order, active")
+        .select("id, mechanic_name, mechanic_item_no, display_order, active")
         .order("display_order", { ascending: true })
         .order("mechanic_name", { ascending: true }),
       getDashboardViewSettings(),
@@ -77,7 +76,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
           <div className="hero__top">
             <div>
               <p className="eyebrow">Indstillinger</p>
-              <h1>Mekanikere, mål og TV-boards</h1>
+              <h1>Mekanikere og TV-boards</h1>
             </div>
           </div>
           <p>Vedligehold mappings for mekanikere og styr hvilke dashboards TV-visningen roterer igennem.</p>
@@ -111,11 +110,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                 <input id="new-mechanic-item-no" name="new_mechanic_item_no" type="text" />
               </div>
               <div className="field">
-                <label htmlFor="new-daily-target-hours">Mål pr. hverdag (timer)</label>
-                <input defaultValue="7.5" id="new-daily-target-hours" min="0" name="new_daily_target_hours" step="0.5" type="number" />
-              </div>
-
-              <div className="field">
                 <label htmlFor="new-display-order">Rækkefølge</label>
                 <input defaultValue={mechanics.length} id="new-display-order" min="0" name="new_display_order" step="1" type="number" />
               </div>
@@ -132,6 +126,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                 <p className="eyebrow">Eksisterende mappings</p>
                 <h2>Vedligehold</h2>
               </div>
+              <p className="muted">Mål beregnes automatisk som 7,5 timer mandag til torsdag, 7,0 timer fredag og 0 timer i weekender og på danske helligdage.</p>
             </div>
 
             {mechanics.length > 0 ? (
@@ -141,7 +136,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                     <tr>
                       <th>Navn</th>
                       <th>Varenummer</th>
-                      <th>Mål pr. hverdag</th>
                       <th>Rækkefølge</th>
                       <th>Aktiv</th>
                     </tr>
@@ -155,9 +149,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                         </td>
                         <td>
                           <input defaultValue={mechanic.mechanic_item_no} name="mechanic_item_no" required type="text" />
-                        </td>
-                        <td>
-                          <input defaultValue={mechanic.daily_target_hours} min="0" name="daily_target_hours" step="0.5" type="number" />
                         </td>
                         <td>
                           <input defaultValue={mechanic.display_order} min="0" name="display_order" step="1" type="number" />

@@ -116,6 +116,13 @@ async function loadReportsModule(responseConfig: Record<string, MockResponse | M
   const queryLog: MockQuery[] = [];
   vi.resetModules();
   vi.doMock("server-only", () => ({}));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => [],
+    })),
+  );
   vi.doMock("@/lib/supabase/server", () => ({
     createAdminClient: () => createMockClient(responseConfig, queryLog),
   }));
@@ -125,6 +132,7 @@ async function loadReportsModule(responseConfig: Record<string, MockResponse | M
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.resetModules();
   vi.unmock("server-only");
   vi.unmock("@/lib/supabase/server");
@@ -311,12 +319,12 @@ describe("reports data helpers", () => {
 
     expect(rows).toHaveLength(12);
     expect(january).toMatchObject({
-      targetQuarters: 60,
+      targetQuarters: 1300,
       registeredQuarters: 52,
       avgQuartersPerMechanic: 26,
     });
     expect(february).toMatchObject({
-      targetQuarters: 0,
+      targetQuarters: 1184,
       registeredQuarters: 0,
       avgQuartersPerMechanic: 0,
     });

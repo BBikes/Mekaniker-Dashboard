@@ -29,6 +29,26 @@ describe("time helpers", () => {
     expect(countWeekdaysBetween("2026-04-06", "2026-04-12")).toBe(5);
     expect(countWeekdaysBetween("2026-04-11", "2026-04-12")).toBe(0);
   });
+
+  it("calculates factual target hours with Friday and Danish holiday rules", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [{ date: "2026-04-03" }],
+      })),
+    );
+
+    const { getDailyTargetHoursForDate, getTargetHoursBetween } = await import("@/lib/targets");
+
+    expect(await getDailyTargetHoursForDate("2026-04-02")).toBe(7.5);
+    expect(await getDailyTargetHoursForDate("2026-04-03")).toBe(0);
+    expect(await getDailyTargetHoursForDate("2026-04-10")).toBe(7);
+    expect(await getDailyTargetHoursForDate("2026-04-11")).toBe(0);
+    expect(await getTargetHoursBetween("2026-04-02", "2026-04-10")).toBe(44.5);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("dashboard windows", () => {

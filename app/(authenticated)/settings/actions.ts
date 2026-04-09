@@ -55,7 +55,6 @@ export async function createMechanicAction(formData: FormData) {
 
   const mechanicName = readText(formData, "mechanic_name");
   const mechanicItemNo = readText(formData, "mechanic_item_no");
-  const dailyTargetHours = readNumber(formData, "daily_target_hours", 8);
   const displayOrder = readInteger(formData, "display_order", 0);
   const active = readBoolean(formData, "active");
 
@@ -67,7 +66,6 @@ export async function createMechanicAction(formData: FormData) {
   const { error } = await supabase.from("mechanic_item_mapping").insert({
     mechanic_name: mechanicName,
     mechanic_item_no: mechanicItemNo,
-    daily_target_hours: dailyTargetHours,
     display_order: displayOrder,
     active,
   });
@@ -89,10 +87,6 @@ export async function saveSettingsAction(formData: FormData) {
   const ids = formData.getAll("id").map((value) => String(value));
   const mechanicNames = formData.getAll("mechanic_name").map((value) => String(value).trim());
   const mechanicItemNos = formData.getAll("mechanic_item_no").map((value) => String(value).trim());
-  const dailyTargetHours = formData.getAll("daily_target_hours").map((value) => {
-    const parsed = Number.parseFloat(String(value).replace(",", "."));
-    return Number.isFinite(parsed) ? parsed : 8;
-  });
   const displayOrders = formData.getAll("display_order").map((value) => {
     const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -113,14 +107,10 @@ export async function saveSettingsAction(formData: FormData) {
 
   const newMechanicName = readText(formData, "new_mechanic_name");
   const newMechanicItemNo = readText(formData, "new_mechanic_item_no");
-  const newDailyTargetHours = readNumber(formData, "new_daily_target_hours", 8);
   const newDisplayOrder = readInteger(formData, "new_display_order", 0);
   const newActive = readBoolean(formData, "new_active");
 
-  if (
-    ids.length > 0 &&
-    (ids.length !== mechanicNames.length || ids.length !== mechanicItemNos.length || ids.length !== dailyTargetHours.length || ids.length !== displayOrders.length)
-  ) {
+  if (ids.length > 0 && (ids.length !== mechanicNames.length || ids.length !== mechanicItemNos.length || ids.length !== displayOrders.length)) {
     redirectWithMessage("Mekanikerlisten kunne ikke gemmes.", "error");
   }
 
@@ -145,7 +135,6 @@ export async function saveSettingsAction(formData: FormData) {
       id,
       mechanic_name: mechanicNames[index],
       mechanic_item_no: mechanicItemNos[index],
-      daily_target_hours: dailyTargetHours[index],
       display_order: displayOrders[index],
       active: activeIds.has(id),
       updated_at: now,
@@ -166,7 +155,6 @@ export async function saveSettingsAction(formData: FormData) {
     const { error } = await supabase.from("mechanic_item_mapping").insert({
       mechanic_name: newMechanicName,
       mechanic_item_no: newMechanicItemNo,
-      daily_target_hours: newDailyTargetHours,
       display_order: newDisplayOrder,
       active: newActive,
     });

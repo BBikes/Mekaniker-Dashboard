@@ -3,6 +3,7 @@ import "server-only";
 import { CustomersFirstClient } from "@/lib/c1st/client";
 import type { NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-material";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getDailyTargetHoursForDate } from "@/lib/targets";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
@@ -11,7 +12,6 @@ type MechanicMapping = {
   id: string;
   mechanic_name: string;
   mechanic_item_no: string;
-  daily_target_hours: number;
   display_order: number;
   active: boolean;
 };
@@ -142,7 +142,7 @@ async function fetchActiveMappings() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("mechanic_item_mapping")
-    .select("id, mechanic_name, mechanic_item_no, daily_target_hours, display_order, active")
+    .select("id, mechanic_name, mechanic_item_no, display_order, active")
     .eq("active", true)
     .order("display_order", { ascending: true })
     .order("mechanic_name", { ascending: true });
@@ -362,70 +362,22 @@ async function loadCarryForwardRows(statDate: string) {
   return previousRows.filter((row) => row.source_payment_id === null && !existingToday.has(row.ticket_material_id));
 }
 
-// In-process cache so we only call the API once per year per process lifetime.
-const danishHolidayCache = new Map<number, Set<string>>();
-
-// Fetches official Danish public holidays for the given year from Nager.Date.
-// Country code DK ensures only Danish holidays are returned.
-// Fails gracefully: if the API is unreachable, returns an empty set so sync continues.
-async function fetchDanishHolidaysForYear(year: number): Promise<Set<string>> {
-  const cached = danishHolidayCache.get(year);
-  if (cached) {
-    return cached;
-  }
-
-  try {
-    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/DK`);
-    if (!response.ok) {
-      return new Set<string>();
-    }
-
-    const data = (await response.json()) as Array<{ date: string }>;
-    const holidays = new Set(data.map((h) => h.date));
-    danishHolidayCache.set(year, holidays);
-    return holidays;
-  } catch {
-    // Network error — don't break sync, treat as no holidays known
-    return new Set<string>();
-  }
-}
-
-// Returns the number of working hours expected on a given date.
-// Mon–Thu: 7.5 h, Fri: 7.0 h, weekend/Danish public holiday: 0 h.
-async function resolveTargetHoursForDate(statDate: string): Promise<number> {
-  const date = new Date(`${statDate}T12:00:00Z`);
-  const dow = date.getUTCDay(); // 0 = søn, 6 = lør
-
-  if (dow === 0 || dow === 6) {
-    return 0;
-  }
-
-  const year = date.getUTCFullYear();
-  const holidays = await fetchDanishHolidaysForYear(year);
-
-  if (holidays.has(statDate)) {
-    return 0;
-  }
-
-  return dow === 5 ? 7.0 : 7.5;
-}
-
-async function recalculateTotals(statDate: string, affectedMechanicIds: string[]) {
-  if (affectedMechanicIds.length === 0) {
+async function recalculateTotals(statDate: string) {
+  const activeMappings = await fetchActiveMappings();
+  if (activeMappings.length === 0) {
     return;
   }
 
   const supabase = createAdminClient();
-  const uniqueMechanicIds = [...new Set(affectedMechanicIds)];
-
-  const targetHoursForDate = await resolveTargetHoursForDate(statDate);
+  const mechanicIds = activeMappings.map((mapping) => mapping.id);
+  const targetHoursForDate = await getDailyTargetHoursForDate(statDate);
 
   const [{ data: baselineRows, error: baselineError }] = await Promise.all([
     supabase
       .from("daily_ticket_item_baselines")
       .select("mechanic_id, today_added_quantity, today_added_hours")
       .eq("stat_date", statDate)
-      .in("mechanic_id", uniqueMechanicIds),
+      .in("mechanic_id", mechanicIds),
   ]);
 
   if (baselineError) {
@@ -434,7 +386,7 @@ async function recalculateTotals(statDate: string, affectedMechanicIds: string[]
 
   const totalsByMechanic = new Map<string, { quarters: number; hours: number; targetHours: number }>();
 
-  for (const mechanicId of uniqueMechanicIds) {
+  for (const mechanicId of mechanicIds) {
     totalsByMechanic.set(mechanicId, {
       quarters: 0,
       hours: 0,
@@ -565,7 +517,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
         }
       }
 
-      await recalculateTotals(statDate, affectedMechanicIds);
+      await recalculateTotals(statDate);
 
       const result: SyncResult = {
         syncLogId,
@@ -728,7 +680,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       }
     }
 
-    await recalculateTotals(statDate, [...affectedMechanicIds]);
+    await recalculateTotals(statDate);
 
     const result: SyncResult = {
       syncLogId,

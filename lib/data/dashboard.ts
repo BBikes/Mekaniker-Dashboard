@@ -1,9 +1,9 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/server";
+import { getDailyTargetHoursForDate, getTargetHoursBetween } from "@/lib/targets";
 import {
   addDays,
-  countWeekdaysBetween,
   formatCopenhagenDate,
   formatShortDateRange,
   getCopenhagenDateString,
@@ -21,7 +21,6 @@ type MechanicMappingRow = {
   id: string;
   mechanic_name: string;
   display_order: number;
-  daily_target_hours: number;
 };
 
 type AggregatedTotalRow = {
@@ -310,7 +309,7 @@ async function getMechanicMappings(): Promise<MechanicMappingRow[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("mechanic_item_mapping")
-    .select("id, mechanic_name, display_order, daily_target_hours")
+    .select("id, mechanic_name, display_order")
     .eq("active", true)
     .order("display_order", { ascending: true })
     .order("mechanic_name", { ascending: true });
@@ -351,12 +350,9 @@ async function getAggregatedTotals(fromDate: string, toDate: string): Promise<Ma
   return totals;
 }
 
-function buildPeriodRows(mappings: MechanicMappingRow[], totals: Map<string, AggregatedTotalRow>, fromDate: string, toDate: string) {
-  const workdays = countWeekdaysBetween(fromDate, toDate);
-
+function buildPeriodRows(mappings: MechanicMappingRow[], totals: Map<string, AggregatedTotalRow>, targetHours: number) {
   return mappings.map((mapping) => {
     const total = totals.get(mapping.id);
-    const targetHours = workdays * toNumber(mapping.daily_target_hours);
 
     return {
       id: mapping.id,
@@ -370,7 +366,7 @@ function buildPeriodRows(mappings: MechanicMappingRow[], totals: Map<string, Agg
 
 async function buildPeriodBoard(setting: DashboardViewSetting, mappings: MechanicMappingRow[], today: string): Promise<DashboardPeriodBoard> {
   const window = getDashboardWindow(setting.boardType, today);
-  const totals = await getAggregatedTotals(window.fromDate, window.toDate);
+  const [totals, targetHours] = await Promise.all([getAggregatedTotals(window.fromDate, window.toDate), getTargetHoursBetween(window.fromDate, window.toDate)]);
 
   return {
     kind: "period",
@@ -379,7 +375,7 @@ async function buildPeriodBoard(setting: DashboardViewSetting, mappings: Mechani
     subtitle: window.subtitle,
     rangeLabel: formatShortDateRange(window.fromDate, window.toDate),
     durationSeconds: setting.durationSeconds,
-    rows: buildPeriodRows(mappings, totals, window.fromDate, window.toDate),
+    rows: buildPeriodRows(mappings, totals, targetHours),
   };
 }
 
@@ -387,10 +383,13 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
   const currentWeek = getDashboardWindow("current_week", today);
   const currentMonth = getDashboardWindow("current_month", today);
 
-  const [todayTotals, weekTotals, monthTotals] = await Promise.all([
+  const [todayTotals, weekTotals, monthTotals, todayTargetHours, weekTargetHours, monthTargetHours] = await Promise.all([
     getAggregatedTotals(today, today),
     getAggregatedTotals(currentWeek.fromDate, currentWeek.toDate),
     getAggregatedTotals(currentMonth.fromDate, currentMonth.toDate),
+    getDailyTargetHoursForDate(today),
+    getTargetHoursBetween(currentWeek.fromDate, currentWeek.toDate),
+    getTargetHoursBetween(currentMonth.fromDate, currentMonth.toDate),
   ]);
 
   const selectedMechanics = mappings.filter((mapping) => setting.selectedMechanicIds.includes(mapping.id));
@@ -411,21 +410,21 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
           label: "I dag",
           hours: toNumber(todayTotals.get(mapping.id)?.hours_total),
           quarters: toNumber(todayTotals.get(mapping.id)?.quarters_total),
-          targetHours: toNumber(mapping.daily_target_hours),
+          targetHours: todayTargetHours,
         },
         {
           key: "current_week",
           label: "Aktuel uge",
           hours: toNumber(weekTotals.get(mapping.id)?.hours_total),
           quarters: toNumber(weekTotals.get(mapping.id)?.quarters_total),
-          targetHours: countWeekdaysBetween(currentWeek.fromDate, currentWeek.toDate) * toNumber(mapping.daily_target_hours),
+          targetHours: weekTargetHours,
         },
         {
           key: "current_month",
           label: "Aktuel måned",
           hours: toNumber(monthTotals.get(mapping.id)?.hours_total),
           quarters: toNumber(monthTotals.get(mapping.id)?.quarters_total),
-          targetHours: countWeekdaysBetween(currentMonth.fromDate, currentMonth.toDate) * toNumber(mapping.daily_target_hours),
+          targetHours: monthTargetHours,
         },
       ],
     })),
