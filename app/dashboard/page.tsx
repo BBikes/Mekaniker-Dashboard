@@ -50,14 +50,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="dashboard-shell">
-      <div className="dashboard-topline">
-        <div>
-          <p className="eyebrow">TV-visning</p>
-          <p className="dashboard-topline__date">{dashboard.statDateLabel}</p>
-        </div>
-        <p className="muted">Sidst opdateret {lastUpdatedLabel}</p>
-      </div>
-      <DashboardRotator boards={dashboard.boards} initialRefreshToken={dashboard.refreshToken} />
+      <DashboardRotator
+        boards={dashboard.boards}
+        initialRefreshToken={dashboard.refreshToken}
+        lastUpdatedLabel={lastUpdatedLabel}
+      />
     </main>
   );
 }

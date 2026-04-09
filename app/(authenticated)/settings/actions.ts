@@ -118,6 +118,60 @@ export async function updateMechanicAction(formData: FormData) {
   redirectWithMessage("Mekaniker gemt.", "success");
 }
 
+export async function bulkUpdateMechanicsAction(formData: FormData) {
+  const user = await getCurrentUserOrNull();
+  if (!user) {
+    redirect("/login?redirect=/settings");
+  }
+
+  const ids = formData.getAll("id").map((value) => String(value));
+  const mechanicNames = formData.getAll("mechanic_name").map((value) => String(value).trim());
+  const mechanicItemNos = formData.getAll("mechanic_item_no").map((value) => String(value).trim());
+  const dailyTargetHours = formData.getAll("daily_target_hours").map((value) => {
+    const parsed = Number.parseFloat(String(value).replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : 8;
+  });
+  const displayOrders = formData.getAll("display_order").map((value) => {
+    const parsed = Number.parseInt(String(value), 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
+  const activeIds = new Set(formData.getAll("active_ids").map((value) => String(value)));
+
+  if (
+    ids.length === 0 ||
+    ids.length !== mechanicNames.length ||
+    ids.length !== mechanicItemNos.length ||
+    ids.length !== dailyTargetHours.length ||
+    ids.length !== displayOrders.length
+  ) {
+    redirectWithMessage("Mekanikerlisten kunne ikke gemmes.", "error");
+  }
+
+  const updates = ids.map((id, index) => ({
+    id,
+    mechanic_name: mechanicNames[index],
+    mechanic_item_no: mechanicItemNos[index],
+    daily_target_hours: dailyTargetHours[index],
+    display_order: displayOrders[index],
+    active: activeIds.has(id),
+    updated_at: new Date().toISOString(),
+  }));
+
+  if (updates.some((row) => !row.id || !row.mechanic_name || !row.mechanic_item_no)) {
+    redirectWithMessage("Alle mekanikere skal have navn og varenummer.", "error");
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("mechanic_item_mapping").upsert(updates, { onConflict: "id" });
+
+  if (error) {
+    redirectWithMessage(error.message, "error");
+  }
+
+  revalidateViews();
+  redirectWithMessage("Mekanikerændringer gemt.", "success");
+}
+
 export async function updateDashboardViewSettingAction(formData: FormData) {
   const user = await getCurrentUserOrNull();
   if (!user) {
@@ -152,4 +206,46 @@ export async function updateDashboardViewSettingAction(formData: FormData) {
 
   revalidateViews();
   redirectWithMessage("Dashboard-indstilling gemt.", "success");
+}
+
+export async function bulkUpdateDashboardViewSettingsAction(formData: FormData) {
+  const user = await getCurrentUserOrNull();
+  if (!user) {
+    redirect("/login?redirect=/settings");
+  }
+
+  const boardTypes = formData.getAll("board_type").map((value) => String(value));
+  const durations = formData.getAll("duration_seconds").map((value) => {
+    const parsed = Number.parseInt(String(value), 10);
+    return Number.isFinite(parsed) ? Math.max(5, parsed) : 20;
+  });
+  const displayOrders = formData.getAll("display_order").map((value) => {
+    const parsed = Number.parseInt(String(value), 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
+  const activeBoardTypes = new Set(formData.getAll("active_board_types").map((value) => String(value)));
+
+  if (boardTypes.length === 0 || boardTypes.length !== durations.length || boardTypes.length !== displayOrders.length) {
+    redirectWithMessage("Dashboard-indstillingerne kunne ikke gemmes.", "error");
+  }
+
+  const now = new Date().toISOString();
+  const updates = boardTypes.map((boardType, index) => ({
+    board_type: boardType,
+    duration_seconds: durations[index],
+    display_order: displayOrders[index],
+    active: activeBoardTypes.has(boardType),
+    selected_mechanic_ids: formData.getAll(`selected_mechanic_ids_${boardType}`).map((value) => String(value)),
+    updated_at: now,
+  }));
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("dashboard_view_settings").upsert(updates, { onConflict: "board_type" });
+
+  if (error) {
+    redirectWithMessage(error.message, "error");
+  }
+
+  revalidateViews();
+  redirectWithMessage("Dashboard-indstillinger gemt.", "success");
 }

@@ -9,6 +9,7 @@ import { formatHours } from "@/lib/time";
 type DashboardRotatorProps = {
   boards: DashboardBoard[];
   initialRefreshToken: string;
+  lastUpdatedLabel: string;
   pollMs?: number;
 };
 
@@ -94,31 +95,28 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
   }
 
   return (
-    <>
-      <p className="chart-target-note">Skala til {formatHours(chartMax)}</p>
-      <div className="bars">
-        {rows.map((row) => {
-          const targetRatio = Math.min((Math.max(row.targetHours, 0) / chartMax) * 100, 100);
-          const fillRatio = clampBarHeight(row.hours, chartMax);
-          const pct = row.targetHours > 0 ? row.hours / row.targetHours : 0;
+    <div className="bars">
+      {rows.map((row) => {
+        const targetRatio = Math.min((Math.max(row.targetHours, 0) / chartMax) * 100, 100);
+        const fillRatio = clampBarHeight(row.hours, chartMax);
+        const pct = row.targetHours > 0 ? row.hours / row.targetHours : 0;
 
-          return (
-            <article className="bar-card" key={row.id}>
-              <div className="bar-track">
-                <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
-                <div className="bar-fill" style={{ height: `${fillRatio}%`, ...barStyle(pct) }}>
-                  {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
-                </div>
-                <div className="bar-value-overlay" style={{ bottom: `calc(${targetRatio}% + 10px)` }}>
-                  {formatHours(row.hours)}
-                </div>
+        return (
+          <article className="bar-card" key={row.id}>
+            <div className="bar-track">
+              <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
+              <div className="bar-fill" style={{ height: `${fillRatio}%`, ...barStyle(pct) }}>
+                {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
               </div>
-              <div className="bar-label">{row.mechanicName}</div>
-            </article>
-          );
-        })}
-      </div>
-    </>
+              <div className="bar-value-overlay" style={{ bottom: `calc(${targetRatio}% + 10px)` }}>
+                {formatHours(row.hours)}
+              </div>
+            </div>
+            <div className="bar-label">{row.mechanicName}</div>
+          </article>
+        );
+      })}
+    </div>
   );
 }
 
@@ -134,7 +132,6 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
 
         return (
           <article className="focus-bar-card" key={metric.key}>
-            <div className="focus-bar-label">{metric.label}</div>
             <div className="focus-bar-track">
               <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
               <div className="bar-fill" style={{ height: `${fillRatio}%`, ...barStyle(pct) }}>
@@ -142,6 +139,7 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
               </div>
               <div className="focus-bar-value">{formatHours(metric.hours)}</div>
             </div>
+            <div className="focus-bar-label">{metric.label}</div>
           </article>
         );
       })}
@@ -149,7 +147,7 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
   );
 }
 
-function DashboardBoardView({ board }: { board: DashboardBoard | null }) {
+function DashboardBoardView({ board, lastUpdatedLabel }: { board: DashboardBoard | null; lastUpdatedLabel: string }) {
   if (!board) {
     return (
       <section className="dashboard-card">
@@ -173,7 +171,7 @@ function DashboardBoardView({ board }: { board: DashboardBoard | null }) {
         </div>
         <div className="dashboard-meta">
           <p>{board.rangeLabel}</p>
-          <p className="muted">{board.subtitle}</p>
+          <p className="muted">Sidst opdateret {lastUpdatedLabel}</p>
         </div>
       </header>
 
@@ -181,14 +179,11 @@ function DashboardBoardView({ board }: { board: DashboardBoard | null }) {
         {board.kind === "period" ? (
           <PeriodBars rows={board.rows} />
         ) : board.mechanics.length > 0 ? (
-          <div className="focus-grid">
+          <div className="focus-groups">
             {board.mechanics.map((mechanic) => (
-              <section className="focus-panel" key={mechanic.id}>
-                <div>
-                  <p className="eyebrow">Mekaniker</p>
-                  <h2>{mechanic.mechanicName}</h2>
-                </div>
+              <section className="focus-group" key={mechanic.id}>
                 <FocusMetricBars metrics={mechanic.metrics} />
+                <div className="focus-group-label">{mechanic.mechanicName}</div>
               </section>
             ))}
           </div>
@@ -200,7 +195,7 @@ function DashboardBoardView({ board }: { board: DashboardBoard | null }) {
   );
 }
 
-export function DashboardRotator({ boards, initialRefreshToken, pollMs = 30000 }: DashboardRotatorProps) {
+export function DashboardRotator({ boards, initialRefreshToken, lastUpdatedLabel, pollMs = 30000 }: DashboardRotatorProps) {
   const router = useRouter();
   const latestTokenRef = useRef(initialRefreshToken);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -266,5 +261,5 @@ export function DashboardRotator({ boards, initialRefreshToken, pollMs = 30000 }
     };
   }, [pollMs, router]);
 
-  return <DashboardBoardView board={activeBoard} />;
+  return <DashboardBoardView board={activeBoard} lastUpdatedLabel={lastUpdatedLabel} />;
 }

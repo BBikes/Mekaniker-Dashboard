@@ -5,7 +5,11 @@ import { getDashboardViewSettings } from "@/lib/data/dashboard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 
-import { createMechanicAction, updateDashboardViewSettingAction, updateMechanicAction } from "./actions";
+import {
+  bulkUpdateDashboardViewSettingsAction,
+  bulkUpdateMechanicsAction,
+  createMechanicAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +97,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
             <p className="muted">Varenummeret skal matche den mekanikerlinje, der registreres på arbejdskortet.</p>
           </div>
           <form action={createMechanicAction} className="settings-form-grid">
+            <div className="settings-actions settings-actions--full">
+              <button className="button button--accent" type="submit">
+                Gem ændringer
+              </button>
+            </div>
             <div className="field">
               <label htmlFor="new-mechanic-name">Navn</label>
               <input id="new-mechanic-name" name="mechanic_name" required type="text" />
@@ -114,9 +123,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
               <input defaultChecked name="active" type="checkbox" />
               Aktiv
             </label>
-            <button className="button button--accent" type="submit">
-              Opret mekaniker
-            </button>
+            <div className="settings-actions settings-actions--full">
+              <button className="button button--accent" type="submit">
+                Gem ændringer
+              </button>
+            </div>
           </form>
         </section>
 
@@ -129,54 +140,53 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
           </div>
 
           {mechanics.length > 0 ? (
-            <div className="table-wrap">
-              <table className="settings-table">
-                <thead>
-                  <tr>
-                    <th>Navn</th>
-                    <th>Varenummer</th>
-                    <th>Mål pr. hverdag</th>
-                    <th>Rækkefølge</th>
-                    <th>Aktiv</th>
-                    <th>Handling</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mechanics.map((mechanic) => {
-                    const formId = `mechanic-form-${mechanic.id}`;
-
-                    return (
+            <form action={bulkUpdateMechanicsAction}>
+              <div className="settings-actions">
+                <button className="button button--accent" type="submit">
+                  Gem ændringer
+                </button>
+              </div>
+              <div className="table-wrap">
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Navn</th>
+                      <th>Varenummer</th>
+                      <th>Mål pr. hverdag</th>
+                      <th>Rækkefølge</th>
+                      <th>Aktiv</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mechanics.map((mechanic) => (
                       <tr key={mechanic.id}>
                         <td>
-                          <input defaultValue={mechanic.mechanic_name} form={formId} name="mechanic_name" required type="text" />
+                          <input name="id" type="hidden" value={mechanic.id} />
+                          <input defaultValue={mechanic.mechanic_name} name="mechanic_name" required type="text" />
                         </td>
                         <td>
-                          <input defaultValue={mechanic.mechanic_item_no} form={formId} name="mechanic_item_no" required type="text" />
+                          <input defaultValue={mechanic.mechanic_item_no} name="mechanic_item_no" required type="text" />
                         </td>
                         <td>
-                          <input defaultValue={mechanic.daily_target_hours} form={formId} min="0" name="daily_target_hours" step="0.5" type="number" />
-                        </td>
-
-                        <td>
-                          <input defaultValue={mechanic.display_order} form={formId} min="0" name="display_order" step="1" type="number" />
+                          <input defaultValue={mechanic.daily_target_hours} min="0" name="daily_target_hours" step="0.5" type="number" />
                         </td>
                         <td>
-                          <input defaultChecked={mechanic.active} form={formId} name="active" type="checkbox" />
+                          <input defaultValue={mechanic.display_order} min="0" name="display_order" step="1" type="number" />
                         </td>
                         <td>
-                          <form action={updateMechanicAction} id={formId}>
-                            <input name="id" type="hidden" value={mechanic.id} />
-                            <button className="button button--ghost" type="submit">
-                              Gem
-                            </button>
-                          </form>
+                          <input defaultChecked={mechanic.active} name="active_ids" type="checkbox" value={mechanic.id} />
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="settings-actions settings-actions--bottom">
+                <button className="button button--accent" type="submit">
+                  Gem ændringer
+                </button>
+              </div>
+            </form>
           ) : (
             <p className="muted">Ingen mekanikere endnu. Opret den første mapping ovenfor for at gøre sync og dashboard brugbare.</p>
           )}
@@ -192,64 +202,67 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
           </div>
 
           {dashboardViews.length > 0 ? (
-            <div className="table-wrap">
-              <table className="settings-table">
-                <thead>
-                  <tr>
-                    <th>Board</th>
-                    <th>Varighed (sek.)</th>
-                    <th>Rækkefølge</th>
-                    <th>Aktiv</th>
-                    <th>Valgte mekanikere</th>
-                    <th>Handling</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardViews.map((view) => {
-                    const formId = `dashboard-view-form-${view.boardType}`;
-                    const isFocusBoard = view.boardType === "mechanic_focus";
+            <form action={bulkUpdateDashboardViewSettingsAction}>
+              <div className="settings-actions">
+                <button className="button button--accent" type="submit">
+                  Gem ændringer
+                </button>
+              </div>
+              <div className="table-wrap">
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Board</th>
+                      <th>Varighed (sek.)</th>
+                      <th>Rækkefølge</th>
+                      <th>Aktiv</th>
+                      <th>Valgte mekanikere</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardViews.map((view) => {
+                      const isFocusBoard = view.boardType === "mechanic_focus";
 
-                    return (
-                      <tr key={view.boardType}>
-                        <td>
-                          <strong>{view.boardTitle}</strong>
-                        </td>
-                        <td>
-                          <input defaultValue={view.durationSeconds} form={formId} min="5" name="duration_seconds" step="1" type="number" />
-                        </td>
-                        <td>
-                          <input defaultValue={view.displayOrder} form={formId} min="0" name="display_order" step="1" type="number" />
-                        </td>
-                        <td>
-                          <input defaultChecked={view.active} form={formId} name="active" type="checkbox" />
-                        </td>
-                        <td>
-                          {isFocusBoard ? (
-                            <select defaultValue={view.selectedMechanicIds} form={formId} multiple name="selected_mechanic_ids" size={Math.min(Math.max(mechanics.length, 3), 6)}>
-                              {mechanics.map((mechanic) => (
-                                <option key={mechanic.id} value={mechanic.id}>
-                                  {mechanic.mechanic_name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="muted">Bruger alle aktive mekanikere</span>
-                          )}
-                        </td>
-                        <td>
-                          <form action={updateDashboardViewSettingAction} id={formId}>
+                      return (
+                        <tr key={view.boardType}>
+                          <td>
                             <input name="board_type" type="hidden" value={view.boardType} />
-                            <button className="button button--ghost" type="submit">
-                              Gem
-                            </button>
-                          </form>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            <strong>{view.boardTitle}</strong>
+                          </td>
+                          <td>
+                            <input defaultValue={view.durationSeconds} min="5" name="duration_seconds" step="1" type="number" />
+                          </td>
+                          <td>
+                            <input defaultValue={view.displayOrder} min="0" name="display_order" step="1" type="number" />
+                          </td>
+                          <td>
+                            <input defaultChecked={view.active} name="active_board_types" type="checkbox" value={view.boardType} />
+                          </td>
+                          <td>
+                            {isFocusBoard ? (
+                              <select defaultValue={view.selectedMechanicIds} multiple name={`selected_mechanic_ids_${view.boardType}`} size={Math.min(Math.max(mechanics.length, 3), 6)}>
+                                {mechanics.map((mechanic) => (
+                                  <option key={mechanic.id} value={mechanic.id}>
+                                    {mechanic.mechanic_name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="muted">Bruger alle aktive mekanikere</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="settings-actions settings-actions--bottom">
+                <button className="button button--accent" type="submit">
+                  Gem ændringer
+                </button>
+              </div>
+            </form>
           ) : (
             <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
           )}

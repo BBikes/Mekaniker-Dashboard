@@ -301,27 +301,10 @@ select {
   padding: 24px;
   box-sizing: border-box;
   overflow: hidden;
-  display: grid;
-  gap: 14px;
-}
-
-.dashboard-topline {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 16px;
-  padding: 0 8px;
-  flex-wrap: wrap;
-}
-
-.dashboard-topline__date {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
 }
 
 .dashboard-card {
-  min-height: 0;
+  height: 100%;
   border-radius: 28px;
   background: rgba(255, 253, 248, 0.9);
   border: 1px solid rgba(23, 34, 31, 0.08);
@@ -367,14 +350,6 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   align-items: stretch;
   gap: 72px;
-}
-
-.chart-target-note {
-  margin: 0 0 10px;
-  text-align: right;
-  color: var(--target);
-  font-size: 1rem;
-  font-weight: 700;
 }
 
 .bar-card {
@@ -435,52 +410,48 @@ select {
 .bar-fill--under {}
 .bar-fill--met {}
 
-.focus-grid {
+.focus-groups {
   height: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 24px;
   align-items: stretch;
 }
 
-.focus-panel {
+.focus-group {
   min-height: 0;
-  border-radius: 22px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.45);
-  padding: 20px;
-  display: grid;
-  gap: 16px;
-}
-
-.focus-panel h2 {
-  margin: 0;
-  font-size: clamp(1.4rem, 2vw, 2rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .focus-bars {
-  min-height: 0;
+  flex: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   align-items: end;
 }
 
 .focus-bar-card {
   min-height: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 .focus-bar-label {
   text-align: center;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
 }
 
 .focus-bar-track {
   position: relative;
-  min-height: 260px;
+  flex: 1;
+  min-height: 320px;
   border-radius: 18px;
   background: rgba(15, 118, 110, 0.06);
   display: flex;
@@ -492,31 +463,49 @@ select {
   position: absolute;
   left: 0;
   right: 0;
-  top: 18px;
+  bottom: calc(100% - 34px);
   text-align: center;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #1a2e28;
   pointer-events: none;
   z-index: 3;
 }
 
+.focus-group-label {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .dashboard-shell {
-    height: auto;
-    min-height: 100vh;
+    height: 100vh;
   }
 
   .dashboard-card {
-    min-height: calc(100vh - 110px);
+    height: 100%;
   }
 
   .bars {
     gap: 28px;
   }
 
+  .focus-groups {
+    gap: 12px;
+  }
+
   .focus-bars {
-    grid-template-columns: repeat(3, minmax(72px, 1fr));
+    gap: 8px;
+  }
+
+  .focus-bar-track {
+    min-height: 240px;
+  }
+
+  .focus-bar-label,
+  .focus-group-label {
+    font-size: 0.82rem;
   }
 }
 
