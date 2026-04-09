@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
+import { CalendarYearOverview } from "@/app/(authenticated)/reports/calendar-year-overview";
 import { FilterBar } from "@/app/(authenticated)/reports/filter-bar";
 import { KpiRow } from "@/app/(authenticated)/reports/kpi-row";
 import { SummaryTable } from "@/app/(authenticated)/reports/summary-table";
 import {
   getActiveMechanics,
   getAdminSummary,
+  getCalendarYearOverview,
   getKpiSnapshot,
   type AdminFilters,
   type PeriodMode,
@@ -226,10 +228,12 @@ export default async function ReportsPage({
 
   try {
     const adminFilters = toAdminFilters(filters);
-    const [mechanics, kpis, rows] = await Promise.all([
+    const calendarYear = Number.parseInt(getCopenhagenDateString().slice(0, 4), 10);
+    const [mechanics, kpis, rows, calendarYearRows] = await Promise.all([
       getActiveMechanics(),
       getKpiSnapshot(adminFilters),
       getAdminSummary(adminFilters),
+      getCalendarYearOverview({ mechanicIds: adminFilters.mechanicIds }, calendarYear),
     ]);
 
     return (
@@ -249,6 +253,7 @@ export default async function ReportsPage({
           <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
           <KpiRow kpis={kpis} />
           <SummaryTable filters={filters} rows={rows} />
+          <CalendarYearOverview rows={calendarYearRows} year={calendarYear} />
         </main>
       </>
     );

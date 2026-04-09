@@ -18,6 +18,7 @@ type DashboardStatusResponse = {
 };
 
 const MIN_BAR_RATIO = 4;
+const TARGET_LINE_RATIO = 75;
 
 type Rgb = [number, number, number];
 
@@ -74,22 +75,18 @@ function clampBarHeight(hours: number, maxHours: number) {
     return 0;
   }
 
-  return Math.max((hours / maxHours) * 100, MIN_BAR_RATIO);
+  return Math.min(Math.max((hours / maxHours) * 100, MIN_BAR_RATIO), 100);
 }
 
-function getChartMax(values: Array<{ hours: number; targetHours: number }>) {
-  const peak = values.reduce((current, value) => Math.max(current, value.hours, value.targetHours), 0);
-
-  if (peak <= 0) {
+function getTargetScaleMax(targetHours: number) {
+  if (targetHours <= 0) {
     return 8;
   }
 
-  return Math.ceil((peak * 1.08) / 2) * 2;
+  return targetHours / (TARGET_LINE_RATIO / 100);
 }
 
 function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
-  const chartMax = getChartMax(rows);
-
   if (rows.length === 0) {
     return <p className="muted">Ingen registreringer i den valgte periode.</p>;
   }
@@ -97,18 +94,18 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
   return (
     <div className="bars">
       {rows.map((row) => {
-        const targetRatio = Math.min((Math.max(row.targetHours, 0) / chartMax) * 100, 100);
+        const chartMax = getTargetScaleMax(row.targetHours);
         const fillRatio = clampBarHeight(row.hours, chartMax);
         const pct = row.targetHours > 0 ? row.hours / row.targetHours : 0;
 
         return (
           <article className="bar-card" key={row.id}>
             <div className="bar-track">
-              <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
+              <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
               <div className="bar-fill" style={{ height: `${fillRatio}%`, ...barStyle(pct) }}>
                 {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
               </div>
-              <div className="bar-value-overlay" style={{ bottom: `calc(${targetRatio}% + 10px)` }}>
+              <div className="bar-value-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
                 {formatHours(row.hours)}
               </div>
             </div>
@@ -121,23 +118,23 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
 }
 
 function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
-  const chartMax = getChartMax(metrics);
-
   return (
     <div className="focus-bars">
       {metrics.map((metric) => {
-        const targetRatio = Math.min((Math.max(metric.targetHours, 0) / chartMax) * 100, 100);
+        const chartMax = getTargetScaleMax(metric.targetHours);
         const fillRatio = clampBarHeight(metric.hours, chartMax);
         const pct = metric.targetHours > 0 ? metric.hours / metric.targetHours : 0;
 
         return (
           <article className="focus-bar-card" key={metric.key}>
             <div className="focus-bar-track">
-              <div className="bar-target-line" style={{ bottom: `${targetRatio}%` }} />
+              <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
               <div className="bar-fill" style={{ height: `${fillRatio}%`, ...barStyle(pct) }}>
                 {metric.quarters > 0 ? `${metric.quarters.toFixed(0)} kv` : ""}
               </div>
-              <div className="focus-bar-value">{formatHours(metric.hours)}</div>
+              <div className="focus-bar-value" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
+                {formatHours(metric.hours)}
+              </div>
             </div>
             <div className="focus-bar-label">{metric.label}</div>
           </article>

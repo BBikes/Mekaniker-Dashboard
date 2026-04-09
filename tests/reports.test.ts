@@ -272,4 +272,53 @@ describe("reports data helpers", () => {
     expect(page.total).toBe(81);
     expect(baselinesQuery?.calls.range).toEqual([[25, 49]]);
   });
+
+  it("builds a calendar-year monthly overview with target and average quarters", async () => {
+    const { reports } = await loadReportsModule({
+      daily_mechanic_totals: {
+        data: [
+          {
+            stat_date: "2026-01-05",
+            mechanic_id: "m-a",
+            quarters_total: 24,
+            hours_total: 6,
+            target_hours: 7.5,
+            variance_hours: -1.5,
+            mechanic: { mechanic_name: "Anders" },
+          },
+          {
+            stat_date: "2026-01-06",
+            mechanic_id: "m-b",
+            quarters_total: 28,
+            hours_total: 7,
+            target_hours: 7.5,
+            variance_hours: -0.5,
+            mechanic: { mechanic_name: "Bente" },
+          },
+        ],
+      },
+      mechanic_item_mapping: {
+        data: [
+          { id: "m-a", mechanic_name: "Anders" },
+          { id: "m-b", mechanic_name: "Bente" },
+        ],
+      },
+    });
+
+    const rows = await reports.getCalendarYearOverview({}, 2026);
+    const january = rows.find((row) => row.monthKey === "2026-01");
+    const february = rows.find((row) => row.monthKey === "2026-02");
+
+    expect(rows).toHaveLength(12);
+    expect(january).toMatchObject({
+      targetQuarters: 60,
+      registeredQuarters: 52,
+      avgQuartersPerMechanic: 26,
+    });
+    expect(february).toMatchObject({
+      targetQuarters: 0,
+      registeredQuarters: 0,
+      avgQuartersPerMechanic: 0,
+    });
+  });
 });

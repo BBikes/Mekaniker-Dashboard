@@ -97,6 +97,14 @@ export type KpiSnapshot = {
   avgPerDay: number;
 };
 
+export type CalendarYearOverviewRow = {
+  monthKey: string;
+  monthLabel: string;
+  targetQuarters: number;
+  registeredQuarters: number;
+  avgQuartersPerMechanic: number;
+};
+
 type TotalsSourceRow = {
   statDate: string;
   mechanicId: string;
@@ -129,6 +137,12 @@ const collator = new Intl.Collator("da-DK", {
 
 function roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function getMonthLabel(year: number, monthIndex: number): string {
+  const formatter = new Intl.DateTimeFormat("da-DK", { month: "long", year: "numeric" });
+  const label = formatter.format(new Date(Date.UTC(year, monthIndex, 1)));
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function toNumeric(value: unknown): number {
@@ -757,6 +771,45 @@ export async function getAdminSummary(filters: AdminFilters): Promise<AdminSumma
 export async function getKpiSnapshot(filters: AdminFilters): Promise<KpiSnapshot> {
   const dataset = await loadSummaryDataset(serializeSummaryDatasetFilters(filters));
   return dataset.kpis;
+}
+
+export async function getCalendarYearOverview(
+  filters: Pick<AdminFilters, "mechanicId" | "mechanicIds">,
+  year = new Date().getUTCFullYear(),
+): Promise<CalendarYearOverviewRow[]> {
+  const fromDate = `${year}-01-01`;
+  const toDate = `${year}-12-31`;
+  const [totalsRows, activeMechanics] = await Promise.all([
+    fetchTotalsSourceRows({ fromDate, toDate, mechanicId: filters.mechanicId, mechanicIds: filters.mechanicIds }),
+    getActiveMechanics(),
+  ]);
+
+  const selectedIds = new Set(normalizeMechanicIds(filters));
+  const mechanicCount =
+    selectedIds.size > 0 ? activeMechanics.filter((mechanic) => selectedIds.has(mechanic.id)).length : activeMechanics.length;
+  const monthly = new Map<string, { targetQuarters: number; registeredQuarters: number }>();
+
+  for (const row of totalsRows) {
+    const monthKey = getMonthKey(row.statDate);
+    const current = monthly.get(monthKey) ?? { targetQuarters: 0, registeredQuarters: 0 };
+
+    current.targetQuarters += row.targetHours * 4;
+    current.registeredQuarters += row.quartersTotal;
+    monthly.set(monthKey, current);
+  }
+
+  return Array.from({ length: 12 }, (_, monthIndex) => {
+    const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const current = monthly.get(monthKey) ?? { targetQuarters: 0, registeredQuarters: 0 };
+
+    return {
+      monthKey,
+      monthLabel: getMonthLabel(year, monthIndex),
+      targetQuarters: roundNumber(current.targetQuarters),
+      registeredQuarters: roundNumber(current.registeredQuarters),
+      avgQuartersPerMechanic: mechanicCount > 0 ? roundNumber(current.registeredQuarters / mechanicCount) : 0,
+    } satisfies CalendarYearOverviewRow;
+  });
 }
 
 export async function getDetailedRows(filters: ReportFilters | AdminDetailedFilters): Promise<DetailedRow[]> {
