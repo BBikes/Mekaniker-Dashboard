@@ -420,18 +420,16 @@ select {
 
 .focus-group {
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
 }
 
 .focus-bars {
-  flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
+  min-height: 0;
 }
 
 .focus-bar-card {
@@ -446,6 +444,8 @@ select {
   text-align: center;
   font-size: 0.9rem;
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .focus-bar-track {
@@ -476,6 +476,7 @@ select {
   text-align: center;
   font-size: 1.05rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
@@ -1037,12 +1038,20 @@ tr:last-child td {
   min-width: 180px;
 }
 
+.settings-checklist--horizontal {
+  display: flex;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .settings-checklist__item {
   display: flex;
   align-items: center;
   gap: 10px;
   font-weight: 600;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .settings-checklist__item input[type="checkbox"] {
@@ -1055,6 +1064,23 @@ tr:last-child td {
   display: flex;
   gap: 6px;
   justify-content: end;
+}
+
+.settings-focus-config {
+  display: grid;
+  gap: 12px;
+  min-width: 280px;
+}
+
+.settings-focus-group {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-focus-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .icon-button {

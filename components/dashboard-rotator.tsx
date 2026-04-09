@@ -119,7 +119,7 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
 
 function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
   return (
-    <div className="focus-bars">
+    <div className="focus-bars" style={{ gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))` }}>
       {metrics.map((metric) => {
         const chartMax = getTargetScaleMax(metric.targetHours);
         const fillRatio = clampBarHeight(metric.hours, chartMax);
@@ -178,7 +178,7 @@ function DashboardBoardView({ board, lastUpdatedLabel }: { board: DashboardBoard
         ) : board.mechanics.length > 0 ? (
           <div className="focus-groups">
             {board.mechanics.map((mechanic) => (
-              <section className="focus-group" key={mechanic.id}>
+              <section className="focus-group" key={mechanic.id} style={{ ["--focus-metric-count" as string]: mechanic.metrics.length }}>
                 <FocusMetricBars metrics={mechanic.metrics} />
                 <div className="focus-group-label">{mechanic.mechanicName}</div>
               </section>

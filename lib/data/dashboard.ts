@@ -37,6 +37,14 @@ export type DashboardBoardType =
   | "current_month"
   | "mechanic_focus";
 
+export type DashboardFocusMetricKey = "today" | "current_week" | "current_month";
+
+export const DASHBOARD_FOCUS_METRIC_OPTIONS: Array<{ key: DashboardFocusMetricKey; label: string }> = [
+  { key: "today", label: "I dag" },
+  { key: "current_week", label: "Aktuel uge" },
+  { key: "current_month", label: "Aktuel måned" },
+];
+
 export type DashboardViewSetting = {
   boardType: DashboardBoardType;
   boardTitle: string;
@@ -44,6 +52,7 @@ export type DashboardViewSetting = {
   durationSeconds: number;
   active: boolean;
   selectedMechanicIds: string[];
+  selectedFocusMetricKeys: DashboardFocusMetricKey[];
   updatedAt: string;
 };
 
@@ -66,12 +75,14 @@ export type DashboardPeriodBoard = {
 };
 
 export type DashboardFocusMetric = {
-  key: "today" | "current_week" | "current_month";
+  key: DashboardFocusMetricKey;
   label: string;
   hours: number;
   quarters: number;
   targetHours: number;
 };
+
+const DEFAULT_FOCUS_METRIC_KEYS = DASHBOARD_FOCUS_METRIC_OPTIONS.map((option) => option.key);
 
 export type DashboardFocusMechanic = {
   id: string;
@@ -114,6 +125,7 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: true,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
   {
@@ -123,6 +135,7 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: true,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
   {
@@ -132,6 +145,7 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: true,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
   {
@@ -141,6 +155,7 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: true,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
   {
@@ -150,6 +165,7 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: true,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
   {
@@ -159,9 +175,22 @@ const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
     durationSeconds: 20,
     active: false,
     selectedMechanicIds: [],
+    selectedFocusMetricKeys: DEFAULT_FOCUS_METRIC_KEYS,
     updatedAt: "1970-01-01T00:00:00.000Z",
   },
 ];
+
+function normalizeFocusMetricKeys(keys: string[] | null | undefined): DashboardFocusMetricKey[] {
+  const normalized = (keys ?? []).filter((key): key is DashboardFocusMetricKey =>
+    DASHBOARD_FOCUS_METRIC_OPTIONS.some((option) => option.key === key),
+  );
+
+  if (normalized.length >= 2 && normalized.length <= 3) {
+    return normalized;
+  }
+
+  return DEFAULT_FOCUS_METRIC_KEYS;
+}
 
 export type DashboardLatestSync = {
   finishedAt: string | null;
@@ -275,7 +304,7 @@ export async function getDashboardViewSettings(): Promise<DashboardViewSetting[]
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("dashboard_view_settings")
-    .select("board_type, board_title, display_order, duration_seconds, active, selected_mechanic_ids, updated_at")
+    .select("board_type, board_title, display_order, duration_seconds, active, selected_mechanic_ids, selected_focus_metric_keys, updated_at")
     .order("display_order", { ascending: true });
 
   if (error) {
@@ -293,6 +322,7 @@ export async function getDashboardViewSettings(): Promise<DashboardViewSetting[]
     duration_seconds: number;
     active: boolean;
     selected_mechanic_ids: string[] | null;
+    selected_focus_metric_keys: DashboardFocusMetricKey[] | null;
     updated_at: string;
   }>).map((row) => ({
     boardType: row.board_type,
@@ -301,6 +331,7 @@ export async function getDashboardViewSettings(): Promise<DashboardViewSetting[]
     durationSeconds: Math.max(5, Number(row.duration_seconds ?? 20)),
     active: Boolean(row.active),
     selectedMechanicIds: row.selected_mechanic_ids ?? [],
+    selectedFocusMetricKeys: normalizeFocusMetricKeys(row.selected_focus_metric_keys),
     updatedAt: row.updated_at,
   }));
 }
@@ -382,6 +413,7 @@ async function buildPeriodBoard(setting: DashboardViewSetting, mappings: Mechani
 async function buildFocusBoard(setting: DashboardViewSetting, mappings: MechanicMappingRow[], today: string): Promise<DashboardFocusBoard> {
   const currentWeek = getDashboardWindow("current_week", today);
   const currentMonth = getDashboardWindow("current_month", today);
+  const selectedMetricKeys = normalizeFocusMetricKeys(setting.selectedFocusMetricKeys);
 
   const [todayTotals, weekTotals, monthTotals, todayTargetHours, weekTargetHours, monthTargetHours] = await Promise.all([
     getAggregatedTotals(today, today),
@@ -398,35 +430,51 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
     kind: "focus",
     key: setting.boardType,
     title: setting.boardTitle || "Mekaniker-fokus",
-    subtitle: "Tre søjler pr. valgt mekaniker",
-    rangeLabel: `${formatShortDateRange(today, today)} · ${formatShortDateRange(currentWeek.fromDate, currentWeek.toDate)} · ${formatShortDateRange(currentMonth.fromDate, currentMonth.toDate)}`,
+    subtitle: "2-3 søjler pr. valgt mekaniker",
+    rangeLabel: selectedMetricKeys
+      .map((metricKey) => {
+        switch (metricKey) {
+          case "today":
+            return formatShortDateRange(today, today);
+          case "current_week":
+            return formatShortDateRange(currentWeek.fromDate, currentWeek.toDate);
+          case "current_month":
+            return formatShortDateRange(currentMonth.fromDate, currentMonth.toDate);
+        }
+      })
+      .join(" · "),
     durationSeconds: setting.durationSeconds,
     mechanics: selectedMechanics.map((mapping) => ({
       id: mapping.id,
       mechanicName: mapping.mechanic_name,
-      metrics: [
-        {
-          key: "today",
-          label: "I dag",
-          hours: toNumber(todayTotals.get(mapping.id)?.hours_total),
-          quarters: toNumber(todayTotals.get(mapping.id)?.quarters_total),
-          targetHours: todayTargetHours,
-        },
-        {
-          key: "current_week",
-          label: "Aktuel uge",
-          hours: toNumber(weekTotals.get(mapping.id)?.hours_total),
-          quarters: toNumber(weekTotals.get(mapping.id)?.quarters_total),
-          targetHours: weekTargetHours,
-        },
-        {
-          key: "current_month",
-          label: "Aktuel måned",
-          hours: toNumber(monthTotals.get(mapping.id)?.hours_total),
-          quarters: toNumber(monthTotals.get(mapping.id)?.quarters_total),
-          targetHours: monthTargetHours,
-        },
-      ],
+      metrics: selectedMetricKeys.map((metricKey) => {
+        switch (metricKey) {
+          case "today":
+            return {
+              key: "today",
+              label: "I dag",
+              hours: toNumber(todayTotals.get(mapping.id)?.hours_total),
+              quarters: toNumber(todayTotals.get(mapping.id)?.quarters_total),
+              targetHours: todayTargetHours,
+            } satisfies DashboardFocusMetric;
+          case "current_week":
+            return {
+              key: "current_week",
+              label: "Aktuel uge",
+              hours: toNumber(weekTotals.get(mapping.id)?.hours_total),
+              quarters: toNumber(weekTotals.get(mapping.id)?.quarters_total),
+              targetHours: weekTargetHours,
+            } satisfies DashboardFocusMetric;
+          case "current_month":
+            return {
+              key: "current_month",
+              label: "Aktuel måned",
+              hours: toNumber(monthTotals.get(mapping.id)?.hours_total),
+              quarters: toNumber(monthTotals.get(mapping.id)?.quarters_total),
+              targetHours: monthTargetHours,
+            } satisfies DashboardFocusMetric;
+        }
+      }),
     })),
   };
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
-import { getDashboardViewSettings } from "@/lib/data/dashboard";
+import { DASHBOARD_FOCUS_METRIC_OPTIONS, getDashboardViewSettings } from "@/lib/data/dashboard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 
@@ -184,7 +184,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                       <th>Varighed (sek.)</th>
                       <th>Rækkefølge</th>
                       <th>Aktiv</th>
-                      <th>Valgte mekanikere</th>
+                      <th>Fokusvalg</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -209,18 +209,39 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                           </td>
                           <td>
                             {isFocusBoard ? (
-                              <div className="settings-checklist">
-                                {mechanics.map((mechanic) => (
-                                  <label className="settings-checklist__item" key={mechanic.id}>
-                                    <input
-                                      defaultChecked={view.selectedMechanicIds.includes(mechanic.id)}
-                                      name={`selected_mechanic_ids_${view.boardType}`}
-                                      type="checkbox"
-                                      value={mechanic.id}
-                                    />
-                                    <span>{mechanic.mechanic_name}</span>
-                                  </label>
-                                ))}
+                              <div className="settings-focus-config">
+                                <div className="settings-focus-group">
+                                  <span className="settings-focus-label">Vis 2-3 værdier</span>
+                                  <div className="settings-checklist settings-checklist--horizontal">
+                                    {DASHBOARD_FOCUS_METRIC_OPTIONS.map((metric) => (
+                                      <label className="settings-checklist__item" key={metric.key}>
+                                        <input
+                                          defaultChecked={view.selectedFocusMetricKeys.includes(metric.key)}
+                                          name={`selected_focus_metric_keys_${view.boardType}`}
+                                          type="checkbox"
+                                          value={metric.key}
+                                        />
+                                        <span>{metric.label}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="settings-focus-group">
+                                  <span className="settings-focus-label">Mekanikere</span>
+                                  <div className="settings-checklist settings-checklist--horizontal">
+                                    {mechanics.map((mechanic) => (
+                                      <label className="settings-checklist__item" key={mechanic.id}>
+                                        <input
+                                          defaultChecked={view.selectedMechanicIds.includes(mechanic.id)}
+                                          name={`selected_mechanic_ids_${view.boardType}`}
+                                          type="checkbox"
+                                          value={mechanic.id}
+                                        />
+                                        <span>{mechanic.mechanic_name}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             ) : (
                               <span className="muted">Bruger alle aktive mekanikere</span>

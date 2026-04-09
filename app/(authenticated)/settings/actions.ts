@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getCurrentUserOrNull } from "@/lib/supabase/server-auth";
+import { DASHBOARD_FOCUS_METRIC_OPTIONS, type DashboardFocusMetricKey } from "@/lib/data/dashboard";
 
 function redirectWithMessage(message: string, kind: "success" | "error") {
   const params = new URLSearchParams({ message, kind });
@@ -38,6 +39,12 @@ function readStringArray(formData: FormData, key: string) {
     .getAll(key)
     .map((value) => String(value).trim())
     .filter((value) => value.length > 0);
+}
+
+function readFocusMetricKeys(formData: FormData, key: string): DashboardFocusMetricKey[] {
+  return readStringArray(formData, key).filter((value): value is DashboardFocusMetricKey =>
+    DASHBOARD_FOCUS_METRIC_OPTIONS.some((option) => option.key === value),
+  );
 }
 
 function revalidateViews() {
@@ -171,8 +178,19 @@ export async function saveSettingsAction(formData: FormData) {
     display_order: dashboardDisplayOrders[index],
     active: activeBoardTypes.has(boardType),
     selected_mechanic_ids: formData.getAll(`selected_mechanic_ids_${boardType}`).map((value) => String(value)),
+    selected_focus_metric_keys: readFocusMetricKeys(formData, `selected_focus_metric_keys_${boardType}`),
     updated_at: now,
   }));
+
+  const invalidFocusSelection = dashboardUpdates.find(
+    (update) =>
+      update.board_type === "mechanic_focus" &&
+      (update.selected_focus_metric_keys.length < 2 || update.selected_focus_metric_keys.length > 3),
+  );
+
+  if (invalidFocusSelection) {
+    redirectWithMessage("Mekaniker-fokus skal vise mindst 2 og højst 3 værdier.", "error");
+  }
 
   const { error: dashboardError } = await supabase.from("dashboard_view_settings").upsert(dashboardUpdates, {
     onConflict: "board_type",
@@ -349,8 +367,19 @@ export async function bulkUpdateDashboardViewSettingsAction(formData: FormData) 
     display_order: displayOrders[index],
     active: activeBoardTypes.has(boardType),
     selected_mechanic_ids: formData.getAll(`selected_mechanic_ids_${boardType}`).map((value) => String(value)),
+    selected_focus_metric_keys: readFocusMetricKeys(formData, `selected_focus_metric_keys_${boardType}`),
     updated_at: now,
   }));
+
+  const invalidFocusSelection = updates.find(
+    (update) =>
+      update.board_type === "mechanic_focus" &&
+      (update.selected_focus_metric_keys.length < 2 || update.selected_focus_metric_keys.length > 3),
+  );
+
+  if (invalidFocusSelection) {
+    redirectWithMessage("Mekaniker-fokus skal vise mindst 2 og højst 3 værdier.", "error");
+  }
 
   const supabase = createAdminClient();
   const { error } = await supabase.from("dashboard_view_settings").upsert(updates, { onConflict: "board_type" });
