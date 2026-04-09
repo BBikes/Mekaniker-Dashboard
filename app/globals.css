@@ -1021,6 +1021,26 @@ tr:last-child td {
   height: 18px;
 }
 
+.settings-checklist {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.settings-checklist__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settings-checklist__item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .settings-table .row-actions {
   display: flex;
   gap: 6px;

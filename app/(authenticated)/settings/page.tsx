@@ -227,6 +227,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                         <tr key={view.boardType}>
                           <td>
                             <input name="board_type" type="hidden" value={view.boardType} />
+                            <input name="board_title" type="hidden" value={view.boardTitle} />
                             <strong>{view.boardTitle}</strong>
                           </td>
                           <td>
@@ -240,13 +241,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                           </td>
                           <td>
                             {isFocusBoard ? (
-                              <select defaultValue={view.selectedMechanicIds} multiple name={`selected_mechanic_ids_${view.boardType}`} size={Math.min(Math.max(mechanics.length, 3), 6)}>
+                              <div className="settings-checklist">
                                 {mechanics.map((mechanic) => (
-                                  <option key={mechanic.id} value={mechanic.id}>
-                                    {mechanic.mechanic_name}
-                                  </option>
+                                  <label className="settings-checklist__item" key={mechanic.id}>
+                                    <input
+                                      defaultChecked={view.selectedMechanicIds.includes(mechanic.id)}
+                                      name={`selected_mechanic_ids_${view.boardType}`}
+                                      type="checkbox"
+                                      value={mechanic.id}
+                                    />
+                                    <span>{mechanic.mechanic_name}</span>
+                                  </label>
                                 ))}
-                              </select>
+                              </div>
                             ) : (
                               <span className="muted">Bruger alle aktive mekanikere</span>
                             )}

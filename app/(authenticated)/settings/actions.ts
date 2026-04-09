@@ -215,6 +215,7 @@ export async function bulkUpdateDashboardViewSettingsAction(formData: FormData) 
   }
 
   const boardTypes = formData.getAll("board_type").map((value) => String(value));
+  const boardTitles = formData.getAll("board_title").map((value) => String(value));
   const durations = formData.getAll("duration_seconds").map((value) => {
     const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) ? Math.max(5, parsed) : 20;
@@ -225,13 +226,19 @@ export async function bulkUpdateDashboardViewSettingsAction(formData: FormData) 
   });
   const activeBoardTypes = new Set(formData.getAll("active_board_types").map((value) => String(value)));
 
-  if (boardTypes.length === 0 || boardTypes.length !== durations.length || boardTypes.length !== displayOrders.length) {
+  if (
+    boardTypes.length === 0 ||
+    boardTypes.length !== boardTitles.length ||
+    boardTypes.length !== durations.length ||
+    boardTypes.length !== displayOrders.length
+  ) {
     redirectWithMessage("Dashboard-indstillingerne kunne ikke gemmes.", "error");
   }
 
   const now = new Date().toISOString();
   const updates = boardTypes.map((boardType, index) => ({
     board_type: boardType,
+    board_title: boardTitles[index],
     duration_seconds: durations[index],
     display_order: displayOrders[index],
     active: activeBoardTypes.has(boardType),
