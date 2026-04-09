@@ -84,7 +84,7 @@ function getChartMax(values: Array<{ hours: number; targetHours: number }>) {
     return 8;
   }
 
-  return Math.ceil(peak / 2) * 2;
+  return Math.ceil((peak * 1.08) / 2) * 2;
 }
 
 function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {

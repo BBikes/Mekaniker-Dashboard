@@ -6,9 +6,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
 
 import {
-  bulkUpdateDashboardViewSettingsAction,
-  bulkUpdateMechanicsAction,
-  createMechanicAction,
+  saveSettingsAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -88,64 +86,55 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
         {message ? <p className={`flash ${kind === "success" ? "flash--success" : "flash--error"}`}>{message}</p> : null}
         {loadError ? <p className="flash flash--error">{loadError}</p> : null}
 
-        <section className="panel settings-panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Ny mekaniker</p>
-              <h2>Tilføj mapping</h2>
-            </div>
-            <p className="muted">Varenummeret skal matche den mekanikerlinje, der registreres på arbejdskortet.</p>
-          </div>
-          <form action={createMechanicAction} className="settings-form-grid">
-            <div className="settings-actions settings-actions--full">
-              <button className="button button--accent" type="submit">
-                Gem ændringer
-              </button>
-            </div>
-            <div className="field">
-              <label htmlFor="new-mechanic-name">Navn</label>
-              <input id="new-mechanic-name" name="mechanic_name" required type="text" />
-            </div>
-            <div className="field">
-              <label htmlFor="new-mechanic-item-no">Varenummer</label>
-              <input id="new-mechanic-item-no" name="mechanic_item_no" required type="text" />
-            </div>
-            <div className="field">
-              <label htmlFor="new-daily-target-hours">Mål pr. hverdag (timer)</label>
-              <input defaultValue="7.5" id="new-daily-target-hours" min="0" name="daily_target_hours" step="0.5" type="number" />
-            </div>
-
-            <div className="field">
-              <label htmlFor="new-display-order">Rækkefølge</label>
-              <input defaultValue={mechanics.length} id="new-display-order" min="0" name="display_order" step="1" type="number" />
-            </div>
-            <label className="checkbox-field">
-              <input defaultChecked name="active" type="checkbox" />
-              Aktiv
-            </label>
-            <div className="settings-actions settings-actions--full">
-              <button className="button button--accent" type="submit">
-                Gem ændringer
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section className="panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Eksisterende mappings</p>
-              <h2>Vedligehold</h2>
-            </div>
+        <form action={saveSettingsAction} className="settings-page-form">
+          <div className="settings-page-actions">
+            <button className="button button--accent" type="submit">
+              Gem ændringer
+            </button>
           </div>
 
-          {mechanics.length > 0 ? (
-            <form action={bulkUpdateMechanicsAction}>
-              <div className="settings-actions">
-                <button className="button button--accent" type="submit">
-                  Gem ændringer
-                </button>
+          <section className="panel settings-panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Ny mekaniker</p>
+                <h2>Tilføj mapping</h2>
               </div>
+              <p className="muted">Varenummeret skal matche den mekanikerlinje, der registreres på arbejdskortet.</p>
+            </div>
+            <div className="settings-form-grid">
+              <div className="field">
+                <label htmlFor="new-mechanic-name">Navn</label>
+                <input id="new-mechanic-name" name="new_mechanic_name" type="text" />
+              </div>
+              <div className="field">
+                <label htmlFor="new-mechanic-item-no">Varenummer</label>
+                <input id="new-mechanic-item-no" name="new_mechanic_item_no" type="text" />
+              </div>
+              <div className="field">
+                <label htmlFor="new-daily-target-hours">Mål pr. hverdag (timer)</label>
+                <input defaultValue="7.5" id="new-daily-target-hours" min="0" name="new_daily_target_hours" step="0.5" type="number" />
+              </div>
+
+              <div className="field">
+                <label htmlFor="new-display-order">Rækkefølge</label>
+                <input defaultValue={mechanics.length} id="new-display-order" min="0" name="new_display_order" step="1" type="number" />
+              </div>
+              <label className="checkbox-field">
+                <input defaultChecked name="new_active" type="checkbox" />
+                Aktiv
+              </label>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Eksisterende mappings</p>
+                <h2>Vedligehold</h2>
+              </div>
+            </div>
+
+            {mechanics.length > 0 ? (
               <div className="table-wrap">
                 <table className="settings-table">
                   <thead>
@@ -181,33 +170,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   </tbody>
                 </table>
               </div>
-              <div className="settings-actions settings-actions--bottom">
-                <button className="button button--accent" type="submit">
-                  Gem ændringer
-                </button>
-              </div>
-            </form>
-          ) : (
-            <p className="muted">Ingen mekanikere endnu. Opret den første mapping ovenfor for at gøre sync og dashboard brugbare.</p>
-          )}
-        </section>
+            ) : (
+              <p className="muted">Ingen mekanikere endnu. Opret den første mapping ovenfor for at gøre sync og dashboard brugbare.</p>
+            )}
+          </section>
 
-        <section className="panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">TV-dashboard</p>
-              <h2>Boards og rotation</h2>
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">TV-dashboard</p>
+                <h2>Boards og rotation</h2>
+              </div>
+              <p className="muted">Aktive boards vises i rækkefølge på TV-siden. Varighed angives i sekunder.</p>
             </div>
-            <p className="muted">Aktive boards vises i rækkefølge på TV-siden. Varighed angives i sekunder.</p>
-          </div>
 
-          {dashboardViews.length > 0 ? (
-            <form action={bulkUpdateDashboardViewSettingsAction}>
-              <div className="settings-actions">
-                <button className="button button--accent" type="submit">
-                  Gem ændringer
-                </button>
-              </div>
+            {dashboardViews.length > 0 ? (
               <div className="table-wrap">
                 <table className="settings-table">
                   <thead>
@@ -234,7 +211,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                             <input defaultValue={view.durationSeconds} min="5" name="duration_seconds" step="1" type="number" />
                           </td>
                           <td>
-                            <input defaultValue={view.displayOrder} min="0" name="display_order" step="1" type="number" />
+                            <input defaultValue={view.displayOrder} min="0" name="dashboard_display_order" step="1" type="number" />
                           </td>
                           <td>
                             <input defaultChecked={view.active} name="active_board_types" type="checkbox" value={view.boardType} />
@@ -264,16 +241,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   </tbody>
                 </table>
               </div>
-              <div className="settings-actions settings-actions--bottom">
-                <button className="button button--accent" type="submit">
-                  Gem ændringer
-                </button>
-              </div>
-            </form>
-          ) : (
-            <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
-          )}
-        </section>
+            ) : (
+              <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
+            )}
+          </section>
+        </form>
       </main>
     </>
   );

@@ -978,6 +978,16 @@ tr:last-child td {
   margin-bottom: 24px;
 }
 
+.settings-page-form {
+  display: grid;
+  gap: 24px;
+}
+
+.settings-page-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .settings-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
