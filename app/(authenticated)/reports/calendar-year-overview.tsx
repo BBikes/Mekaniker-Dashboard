@@ -1,5 +1,7 @@
 import type { CalendarYearOverviewRow } from "@/lib/data/reports";
-import { formatDecimal } from "@/lib/time";
+import { formatDecimal, formatHours, formatPercent } from "@/lib/time";
+
+import { getFulfillmentStyle } from "./fulfillment-color";
 
 type CalendarYearOverviewProps = {
   rows: CalendarYearOverviewRow[];
@@ -22,18 +24,30 @@ export function CalendarYearOverview({ rows, year }: CalendarYearOverviewProps) 
             <thead>
               <tr>
                 <th>Måned</th>
-                <th>Mål (kv)</th>
-                <th>Registreret (kv)</th>
-                <th>Gns. pr. mekaniker (kv)</th>
+                <th>Kvarterer</th>
+                <th>Timer</th>
+                <th>Mål (t)</th>
+                <th>Difference (t)</th>
+                <th>Opfyldelse</th>
+                <th>Tickets</th>
+                <th>Snit pr. dag</th>
+                <th>Snit pr. ticket</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.monthKey}>
                   <td>{row.monthLabel}</td>
-                  <td>{formatDecimal(row.targetQuarters)}</td>
-                  <td>{formatDecimal(row.registeredQuarters)}</td>
-                  <td>{formatDecimal(row.avgQuartersPerMechanic)}</td>
+                  <td>{formatDecimal(row.quarters)}</td>
+                  <td>{formatHours(row.hours)}</td>
+                  <td>{formatHours(row.targetHours)}</td>
+                  <td>{formatHours(row.varianceHours)}</td>
+                  <td className="cell--fulfillment" style={getFulfillmentStyle(row.fulfillmentPct)}>
+                    {formatPercent(row.fulfillmentPct)}
+                  </td>
+                  <td>{row.tickets}</td>
+                  <td>{formatHours(row.avgHoursPerDay)}</td>
+                  <td>{formatHours(row.avgHoursPerTicket)}</td>
                 </tr>
               ))}
             </tbody>

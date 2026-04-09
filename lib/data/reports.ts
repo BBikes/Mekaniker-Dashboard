@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { getDailyTargetHoursForDate, getTargetHoursBetween, getTargetQuartersBetween } from "@/lib/targets";
+import { getDailyTargetHoursForDate, getTargetHoursBetween } from "@/lib/targets";
 import { addDays, formatPercent, getMonthKey, getWeekKey } from "@/lib/time";
 
 export type PeriodMode = "daily" | "weekly_avg" | "monthly_avg";
@@ -101,9 +101,14 @@ export type KpiSnapshot = {
 export type CalendarYearOverviewRow = {
   monthKey: string;
   monthLabel: string;
-  targetQuarters: number;
-  registeredQuarters: number;
-  avgQuartersPerMechanic: number;
+  quarters: number;
+  hours: number;
+  targetHours: number;
+  varianceHours: number;
+  fulfillmentPct: number;
+  tickets: number;
+  avgHoursPerDay: number;
+  avgHoursPerTicket: number;
 };
 
 type TotalsSourceRow = {
@@ -792,21 +797,50 @@ export async function getCalendarYearOverview(
 ): Promise<CalendarYearOverviewRow[]> {
   const fromDate = `${year}-01-01`;
   const toDate = `${year}-12-31`;
-  const [totalsRows, activeMechanics] = await Promise.all([
+  const [totalsRows, ticketRows, activeMechanics] = await Promise.all([
     fetchTotalsSourceRows({ fromDate, toDate, mechanicId: filters.mechanicId, mechanicIds: filters.mechanicIds }),
+    fetchTicketActivityRows({ fromDate, toDate, mechanicId: filters.mechanicId, mechanicIds: filters.mechanicIds }),
     getActiveMechanics(),
   ]);
 
   const selectedIds = new Set(normalizeMechanicIds(filters));
   const mechanicCount =
     selectedIds.size > 0 ? activeMechanics.filter((mechanic) => selectedIds.has(mechanic.id)).length : activeMechanics.length;
-  const monthly = new Map<string, { registeredQuarters: number }>();
+  const monthly = new Map<
+    string,
+    {
+      quarters: number;
+      hours: number;
+      workdays: Set<string>;
+      ticketIds: Set<number>;
+    }
+  >();
 
   for (const row of totalsRows) {
     const monthKey = getMonthKey(row.statDate);
-    const current = monthly.get(monthKey) ?? { registeredQuarters: 0 };
+    const current = monthly.get(monthKey) ?? {
+      quarters: 0,
+      hours: 0,
+      workdays: new Set<string>(),
+      ticketIds: new Set<number>(),
+    };
 
-    current.registeredQuarters += row.quartersTotal;
+    current.quarters += row.quartersTotal;
+    current.hours += row.hoursTotal;
+    current.workdays.add(row.statDate);
+    monthly.set(monthKey, current);
+  }
+
+  for (const row of ticketRows) {
+    const monthKey = getMonthKey(row.statDate);
+    const current = monthly.get(monthKey) ?? {
+      quarters: 0,
+      hours: 0,
+      workdays: new Set<string>(),
+      ticketIds: new Set<number>(),
+    };
+
+    current.ticketIds.add(row.ticketId);
     monthly.set(monthKey, current);
   }
 
@@ -814,15 +848,28 @@ export async function getCalendarYearOverview(
     const monthStart = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
     const nextMonthStart = monthIndex === 11 ? `${year + 1}-01-01` : `${year}-${String(monthIndex + 2).padStart(2, "0")}-01`;
     const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-    const current = monthly.get(monthKey) ?? { registeredQuarters: 0 };
-    const targetQuartersPerMechanic = await getTargetQuartersBetween(monthStart, addDays(nextMonthStart, -1));
+    const current = monthly.get(monthKey) ?? {
+      quarters: 0,
+      hours: 0,
+      workdays: new Set<string>(),
+      ticketIds: new Set<number>(),
+    };
+    const targetHoursPerMechanic = await getTargetHoursBetween(monthStart, addDays(nextMonthStart, -1));
+    const targetHours = roundNumber(targetHoursPerMechanic * mechanicCount);
+    const varianceHours = roundNumber(current.hours - targetHours);
+    const tickets = current.ticketIds.size;
 
     return {
       monthKey,
       monthLabel: getMonthLabel(year, monthIndex),
-      targetQuarters: roundNumber(targetQuartersPerMechanic * mechanicCount),
-      registeredQuarters: roundNumber(current.registeredQuarters),
-      avgQuartersPerMechanic: mechanicCount > 0 ? roundNumber(current.registeredQuarters / mechanicCount) : 0,
+      quarters: roundNumber(current.quarters),
+      hours: roundNumber(current.hours),
+      targetHours,
+      varianceHours,
+      fulfillmentPct: targetHours > 0 ? current.hours / targetHours : 0,
+      tickets,
+      avgHoursPerDay: current.workdays.size > 0 ? roundNumber(current.hours / current.workdays.size) : 0,
+      avgHoursPerTicket: tickets > 0 ? roundNumber(current.hours / tickets) : 0,
     } satisfies CalendarYearOverviewRow;
   }));
 }

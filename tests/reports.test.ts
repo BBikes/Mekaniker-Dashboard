@@ -305,6 +305,9 @@ describe("reports data helpers", () => {
           },
         ],
       },
+      daily_ticket_item_baselines: {
+        data: [],
+      },
       mechanic_item_mapping: {
         data: [
           { id: "m-a", mechanic_name: "Anders" },
@@ -319,14 +322,24 @@ describe("reports data helpers", () => {
 
     expect(rows).toHaveLength(12);
     expect(january).toMatchObject({
-      targetQuarters: 1300,
-      registeredQuarters: 52,
-      avgQuartersPerMechanic: 26,
+      quarters: 52,
+      hours: 13,
+      targetHours: 325,
+      varianceHours: -312,
+      fulfillmentPct: 13 / 325,
+      tickets: 0,
+      avgHoursPerDay: 6.5,
+      avgHoursPerTicket: 0,
     });
     expect(february).toMatchObject({
-      targetQuarters: 1184,
-      registeredQuarters: 0,
-      avgQuartersPerMechanic: 0,
+      quarters: 0,
+      hours: 0,
+      targetHours: 296,
+      varianceHours: -296,
+      fulfillmentPct: 0,
+      tickets: 0,
+      avgHoursPerDay: 0,
+      avgHoursPerTicket: 0,
     });
   });
 });
