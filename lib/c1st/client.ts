@@ -58,6 +58,15 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function extractSingleContentRecord(payload: unknown): Record<string, unknown> | null {
+  const record = asRecord(payload);
+  if (!record) {
+    return null;
+  }
+
+  return asRecord(record.content) ?? record;
+}
+
 function inferTotalCount(payload: unknown): number | null {
   const record = asRecord(payload);
   if (!record) {
@@ -136,6 +145,10 @@ function normalizeTicket(raw: Record<string, unknown>): NormalizedTicket | null 
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeSearchToken(value: string) {
+  return value.trim().toLocaleLowerCase("en-US");
 }
 
 function readRetryDelayMs(response: Response, attempt: number) {
@@ -422,49 +435,52 @@ export class CustomersFirstClient {
   }
 
   async getCykelPlusCustomerCount(tag: string): Promise<number> {
-    const params = new URLSearchParams();
-    params.set("tags", tag);
-    params.set("paginationStart", "0");
-    params.set("paginationPageLength", "1");
+    const tagId = await this.getCustomerTagId(tag);
+    if (tagId === null) {
+      return 0;
+    }
 
-    const baseUrl = this.config.c1stApiBaseUrl.replace(/\/$/, "");
-    const url = new URL(`${baseUrl}/customers`);
-    url.search = params.toString();
+    let paginationStart = 0;
+    let total = 0;
+    let safetyCounter = 0;
 
-    let response: Response | null = null;
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.config.c1stApiToken}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
+    while (safetyCounter < 1000) {
+      safetyCounter += 1;
 
-      if (response.ok) {
+      const params = new URLSearchParams();
+      params.set("tags", String(tagId));
+      params.set("paginationStart", String(paginationStart));
+      params.set("paginationPageLength", String(this.config.c1stDefaultPageLength));
+
+      const payload = await this.requestJson({ path: "/customers", params });
+      const items = extractItemsFromUnknownPayload(payload);
+
+      total += items.filter((item) => {
+        const customer = asRecord(item);
+        if (!customer || !Array.isArray(customer.tags)) {
+          return false;
+        }
+
+        return customer.tags.some((rawTag) => {
+          const customerTag = asRecord(rawTag);
+          const customerTagId = toInteger(customerTag?.id);
+          return customerTagId === tagId;
+        });
+      }).length;
+
+      const nextStart = inferNextStart(payload, paginationStart, this.config.c1stDefaultPageLength, items.length);
+      if (nextStart === null) {
         break;
       }
 
-      if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
-        throw new Error(`Customers 1st /customers request failed with ${response.status} ${response.statusText}`);
-      }
-
-      await sleep(readRetryDelayMs(response, attempt));
+      paginationStart = nextStart;
     }
 
-    if (!response || !response.ok) {
-      throw new Error("Customers 1st /customers request failed without a valid response.");
+    if (safetyCounter >= 1000) {
+      throw new Error("Stopped Customers 1st customer pagination after 1000 pages");
     }
 
-    const payload = (await response.json()) as unknown;
-    const total = inferTotalCount(payload);
-    if (total !== null) {
-      return total;
-    }
-
-    // Fallback: count items in payload
-    const items = extractItemsFromUnknownPayload(payload);
-    return items.length;
+    return total;
   }
 
   async listAllTicketMaterialsForTicket(ticketId: number) {
@@ -506,11 +522,50 @@ export class CustomersFirstClient {
       return null;
     }
 
-    const record = asRecord(payload);
+    const record = extractSingleContentRecord(payload);
     if (!record) {
       return null;
     }
 
     return normalizeTicket(record);
+  }
+
+  private async getCustomerTagId(tag: string): Promise<number | null> {
+    const explicitTagId = toInteger(tag);
+    if (explicitTagId !== null) {
+      return explicitTagId;
+    }
+
+    const params = new URLSearchParams();
+    params.set("freetext", tag);
+    params.set("paginationStart", "0");
+    params.set("paginationPageLength", String(this.config.c1stDefaultPageLength));
+
+    const payload = await this.requestJson({ path: "/customertags", params });
+    const searchToken = normalizeSearchToken(tag);
+    const matchingTag = extractItemsFromUnknownPayload(payload)
+      .map((item) => {
+        const customerTag = asRecord(item);
+        if (!customerTag) {
+          return null;
+        }
+
+        return {
+          id: toInteger(customerTag.id),
+          title: toStringValue(customerTag.title),
+          handle: toStringValue(customerTag.handle),
+        };
+      })
+      .find((customerTag) => {
+        if (!customerTag?.id) {
+          return false;
+        }
+
+        return [customerTag.title, customerTag.handle]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => normalizeSearchToken(value) === searchToken);
+      });
+
+    return matchingTag?.id ?? null;
   }
 }
