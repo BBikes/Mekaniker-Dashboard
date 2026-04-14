@@ -18,6 +18,7 @@ type ListTicketMaterialsOptions = PaginationOptions & {
 
 export type NormalizedTicket = {
   ticketId: number;
+  ticketType: string | null;
   updatedAt: string | null;
   createdAt: string | null;
   raw: Record<string, unknown>;
@@ -124,6 +125,7 @@ function normalizeTicket(raw: Record<string, unknown>): NormalizedTicket | null 
 
   return {
     ticketId,
+    ticketType: toStringValue(raw.type ?? raw.tickettype ?? raw.tasktype),
     updatedAt: toStringValue(raw.updated_at ?? raw.updatedAt),
     createdAt: toStringValue(raw.created ?? raw.created_at ?? raw.createdAt),
     raw,
@@ -284,6 +286,52 @@ export class CustomersFirstClient {
       paginationStart,
       paginationPageLength: pageLength,
     });
+  }
+
+  async getCykelPlusCustomerCount(tag: string): Promise<number> {
+    const params = new URLSearchParams();
+    params.set("tags", tag);
+    params.set("paginationStart", "0");
+    params.set("paginationPageLength", "1");
+
+    const baseUrl = this.config.c1stApiBaseUrl.replace(/\/$/, "");
+    const url = new URL(`${baseUrl}/customers`);
+    url.search = params.toString();
+
+    let response: Response | null = null;
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${this.config.c1stApiToken}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        break;
+      }
+
+      if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
+        throw new Error(`Customers 1st /customers request failed with ${response.status} ${response.statusText}`);
+      }
+
+      await sleep(readRetryDelayMs(response, attempt));
+    }
+
+    if (!response || !response.ok) {
+      throw new Error("Customers 1st /customers request failed without a valid response.");
+    }
+
+    const payload = (await response.json()) as unknown;
+    const total = inferTotalCount(payload);
+    if (total !== null) {
+      return total;
+    }
+
+    // Fallback: count items in payload
+    const items = extractItemsFromUnknownPayload(payload);
+    return items.length;
   }
 
   async listAllTicketMaterialsForTicket(ticketId: number) {

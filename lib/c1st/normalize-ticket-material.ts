@@ -4,6 +4,7 @@ export type NormalizedTicketMaterial = {
   productNo: string | null;
   title: string | null;
   amount: number;
+  totalInclVat: number | null;
   sourceDate: string | null;
   updatedAt: string | null;
   paymentId: number | null;
@@ -130,6 +131,7 @@ export function normalizeTicketMaterial(raw: unknown): NormalizedTicketMaterial 
     ),
     paymentId: toInteger(firstValue(record, [["paymentid"], ["payment_id"], ["payment", "id"]])),
     amountPaid: toNumber(firstValue(record, [["amountpaid"], ["amount_paid"]])),
+    totalInclVat: toNumber(firstValue(record, [["total_incl_vat"], ["totalinclvat"], ["total_incl_moms"]])),
     amount,
     raw: record,
   };

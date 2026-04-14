@@ -57,6 +57,7 @@ export function getServerConfig() {
     c1stUseUpdatedAfter: getOptionalEnv("C1ST_USE_UPDATED_AFTER", "false") === "true",
     c1stUpdatedAfterParam: getOptionalEnv("C1ST_UPDATED_AFTER_PARAM", "updated_after")!,
     c1stExtraTicketMaterialQuery: getOptionalEnv("C1ST_EXTRA_TICKET_MATERIAL_QUERY", "")!,
+    cykelPlusTag: getOptionalEnv("CYKELPLUS_TAG", "CykelPlus")!,
   };
 }
 

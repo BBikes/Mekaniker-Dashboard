@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { getDailyTargetHoursForDate, getTargetHoursBetween } from "@/lib/targets";
 import {
   addDays,
+  countWeekdaysBetween,
   formatCopenhagenDate,
   formatShortDateRange,
   getCopenhagenDateString,
@@ -35,7 +36,10 @@ export type DashboardBoardType =
   | "last_month"
   | "current_week"
   | "current_month"
-  | "mechanic_focus";
+  | "mechanic_focus"
+  | "revenue_today"
+  | "revenue_current_week"
+  | "revenue_current_month";
 
 export type DashboardFocusMetricKey = "today" | "current_week" | "current_month";
 
@@ -100,7 +104,26 @@ export type DashboardFocusBoard = {
   mechanics: DashboardFocusMechanic[];
 };
 
-export type DashboardBoard = DashboardPeriodBoard | DashboardFocusBoard;
+export type DashboardRevenueMetricKey = "arbeidstid" | "repair" | "cykelplus";
+
+export type DashboardRevenueBar = {
+  key: DashboardRevenueMetricKey;
+  label: string;
+  value: number;
+  targetValue: number;
+  isCurrency: boolean;
+};
+
+export type DashboardRevenueBoard = {
+  kind: "revenue";
+  key: DashboardBoardType;
+  title: string;
+  rangeLabel: string;
+  durationSeconds: number;
+  bars: DashboardRevenueBar[];
+};
+
+export type DashboardBoard = DashboardPeriodBoard | DashboardFocusBoard | DashboardRevenueBoard;
 
 export type DashboardPresentation = {
   statDate: string;
@@ -246,6 +269,27 @@ export function getDashboardWindow(boardType: DashboardBoardType, today = getCop
         title: "Mekaniker-fokus",
         subtitle: "I dag, aktuel uge og aktuel måned",
         fromDate: today,
+        toDate: today,
+      };
+    case "revenue_today":
+      return {
+        title: "Omsætning i dag",
+        subtitle: "Dagens omsætning",
+        fromDate: today,
+        toDate: today,
+      };
+    case "revenue_current_week":
+      return {
+        title: "Omsætning aktuel uge",
+        subtitle: "Mandag til i dag",
+        fromDate: getStartOfWeek(today),
+        toDate: today,
+      };
+    case "revenue_current_month":
+      return {
+        title: "Omsætning aktuel måned",
+        subtitle: "Denne måned til dato",
+        fromDate: getStartOfMonth(today),
         toDate: today,
       };
     case "today":
@@ -479,6 +523,135 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
   };
 }
 
+type RevenueKpiTargetsRow = {
+  metric_key: string;
+  daily_target: number;
+};
+
+async function getRevenueKpiTargets(): Promise<Map<string, number>> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("revenue_kpi_targets")
+    .select("metric_key, daily_target");
+
+  if (error) {
+    throw new Error(`Failed to load revenue KPI targets: ${error.message}`);
+  }
+
+  const map = new Map<string, number>();
+  for (const row of (data ?? []) as RevenueKpiTargetsRow[]) {
+    map.set(row.metric_key, toNumber(row.daily_target));
+  }
+
+  return map;
+}
+
+async function getRevenueTotals(fromDate: string, toDate: string): Promise<{ arbeidstid: number; repair: number }> {
+  const supabase = createAdminClient();
+
+  const [arbeidstidResult, repairResult] = await Promise.all([
+    supabase
+      .from("daily_ticket_item_baselines")
+      .select("line_total_incl_vat")
+      .gte("stat_date", fromDate)
+      .lte("stat_date", toDate)
+      .not("mechanic_id", "is", null),
+    supabase
+      .from("daily_ticket_item_baselines")
+      .select("source_amountpaid")
+      .gte("stat_date", fromDate)
+      .lte("stat_date", toDate)
+      .eq("ticket_type", "repair")
+      .not("source_amountpaid", "is", null),
+  ]);
+
+  if (arbeidstidResult.error) {
+    throw new Error(`Failed to load arbeidstid revenue: ${arbeidstidResult.error.message}`);
+  }
+
+  if (repairResult.error) {
+    throw new Error(`Failed to load repair revenue: ${repairResult.error.message}`);
+  }
+
+  const arbeidstid = (arbeidstidResult.data ?? []).reduce(
+    (sum, row) => sum + toNumber((row as { line_total_incl_vat: unknown }).line_total_incl_vat),
+    0,
+  );
+
+  const repair = (repairResult.data ?? []).reduce(
+    (sum, row) => sum + toNumber((row as { source_amountpaid: unknown }).source_amountpaid),
+    0,
+  );
+
+  return { arbeidstid, repair };
+}
+
+async function getLatestCykelPlusCount(): Promise<number> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("cykelplus_snapshots")
+    .select("customer_count")
+    .order("snapshot_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load CykelPlus count: ${error.message}`);
+  }
+
+  return toNumber((data as { customer_count: unknown } | null)?.customer_count);
+}
+
+async function buildRevenueBoard(setting: DashboardViewSetting, today: string): Promise<DashboardRevenueBoard> {
+  const window = getDashboardWindow(setting.boardType, today);
+  const [revenueTotals, cykelPlusCount, kpiTargets] = await Promise.all([
+    getRevenueTotals(window.fromDate, window.toDate),
+    getLatestCykelPlusCount(),
+    getRevenueKpiTargets(),
+  ]);
+
+  const periodWorkdays = countWeekdaysBetween(window.fromDate, window.toDate);
+
+  const dailyArbeidstidTarget = kpiTargets.get("arbeidstid") ?? 0;
+  const dailyRepairTarget = kpiTargets.get("repair") ?? 0;
+  const dailyCykelPlusTarget = kpiTargets.get("cykelplus") ?? 0;
+
+  const scaledArbeidstid = dailyArbeidstidTarget * Math.max(periodWorkdays, 1);
+  const scaledRepair = dailyRepairTarget * Math.max(periodWorkdays, 1);
+  const scaledCykelPlus = dailyCykelPlusTarget;
+
+  return {
+    kind: "revenue",
+    key: setting.boardType,
+    title: setting.boardTitle || window.title,
+    rangeLabel: formatShortDateRange(window.fromDate, window.toDate),
+    durationSeconds: setting.durationSeconds,
+    bars: [
+      {
+        key: "arbeidstid",
+        label: "Omsætning arbejdstid",
+        value: revenueTotals.arbeidstid,
+        targetValue: scaledArbeidstid,
+        isCurrency: true,
+      },
+      {
+        key: "repair",
+        label: "Omsætning reparationer",
+        value: revenueTotals.repair,
+        targetValue: scaledRepair,
+        isCurrency: true,
+      },
+      {
+        key: "cykelplus",
+        label: "CykelPlus kunder",
+        value: cykelPlusCount,
+        targetValue: scaledCykelPlus,
+        isCurrency: false,
+      },
+    ],
+  };
+}
+
 export async function getDashboardPresentation(): Promise<DashboardPresentation> {
   const statDate = getCopenhagenDateString();
   const [mappings, latestSync, settings] = await Promise.all([
@@ -490,11 +663,17 @@ export async function getDashboardPresentation(): Promise<DashboardPresentation>
   const activeSettings = settings.filter((setting) => setting.active).sort((left, right) => left.displayOrder - right.displayOrder);
   const resolvedSettings = activeSettings.length > 0 ? activeSettings : DEFAULT_VIEW_SETTINGS.filter((setting) => setting.active);
   const boards = await Promise.all(
-    resolvedSettings.map((setting) =>
-      setting.boardType === "mechanic_focus"
-        ? buildFocusBoard(setting, mappings, statDate)
-        : buildPeriodBoard(setting, mappings, statDate),
-    ),
+    resolvedSettings.map((setting) => {
+      if (setting.boardType === "mechanic_focus") {
+        return buildFocusBoard(setting, mappings, statDate);
+      }
+
+      if (setting.boardType === "revenue_today" || setting.boardType === "revenue_current_week" || setting.boardType === "revenue_current_month") {
+        return buildRevenueBoard(setting, statDate);
+      }
+
+      return buildPeriodBoard(setting, mappings, statDate);
+    }),
   );
   const latestSettingUpdate = settings.reduce<string | null>((current, setting) => {
     if (!current || setting.updatedAt > current) {

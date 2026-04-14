@@ -3,6 +3,7 @@ import "server-only";
 import { CustomersFirstClient } from "@/lib/c1st/client";
 import type { NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-material";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getServerConfig } from "@/lib/env";
 import { getDailyTargetHoursForDate } from "@/lib/targets";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
@@ -558,6 +559,11 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
     const client = new CustomersFirstClient();
     const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
+    const ticketTypeByTicketId = new Map(
+      updatedTickets.normalizedItems
+        .filter((ticket) => ticket.ticketType !== null)
+        .map((ticket) => [ticket.ticketId, ticket.ticketType as string]),
+    );
     const ticketMaterials = await fetchTicketScopedMaterials(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
     const changedTicketIds = new Set(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
     const allMaterials = [...ticketMaterials.materialsByTicketId.values()].flatMap((materials) => materials);
@@ -622,6 +628,8 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           source_updated_at: material.updatedAt,
           source_payment_id: material.paymentId,
           source_amountpaid: material.amountPaid,
+          ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? null,
+          line_total_incl_vat: material.totalInclVat ?? null,
           last_seen_at: now,
           anomaly_code: anomalyCode,
           updated_at: now,
@@ -681,6 +689,19 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     }
 
     await recalculateTotals(statDate);
+
+    // Update CykelPlus customer count snapshot
+    try {
+      const config = getServerConfig();
+      const cykelPlusCount = await client.getCykelPlusCustomerCount(config.cykelPlusTag);
+      const supabaseCykelPlus = createAdminClient();
+      await supabaseCykelPlus.from("cykelplus_snapshots").upsert(
+        { snapshot_date: statDate, customer_count: cykelPlusCount, updated_at: now },
+        { onConflict: "snapshot_date" },
+      );
+    } catch {
+      // Non-critical – do not fail the sync if CykelPlus count fails
+    }
 
     const result: SyncResult = {
       syncLogId,

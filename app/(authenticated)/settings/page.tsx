@@ -7,6 +7,7 @@ import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } 
 
 import {
   saveSettingsAction,
+  saveRevenueTargetsAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -45,18 +46,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     active: boolean;
   }> = [];
   let dashboardViews: Awaited<ReturnType<typeof getDashboardViewSettings>> = [];
+  let revenueTargets: Record<string, number> = { arbeidstid: 0, repair: 0, cykelplus: 0 };
   let loadError: string | null = null;
 
   try {
     const supabase = createAdminClient();
-    const [{ data, error }, views] = await Promise.all([
+    const [{ data, error }, views, { data: targetsData }] = await Promise.all([
       supabase
         .from("mechanic_item_mapping")
         .select("id, mechanic_name, mechanic_item_no, display_order, active")
         .order("display_order", { ascending: true })
         .order("mechanic_name", { ascending: true }),
       getDashboardViewSettings(),
+      supabase.from("revenue_kpi_targets").select("metric_key, daily_target"),
     ]);
+
+    for (const row of (targetsData ?? []) as Array<{ metric_key: string; daily_target: number }>) {
+      revenueTargets[row.metric_key] = Number(row.daily_target ?? 0);
+    }
 
     if (error) {
       throw error;
@@ -256,6 +263,61 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
             ) : (
               <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
             )}
+          </section>
+        </form>
+
+        <form action={saveRevenueTargetsAction} className="settings-page-form">
+          <div className="settings-page-actions">
+            <button className="button button--accent" type="submit">
+              Gem omsætningsmål
+            </button>
+          </div>
+
+          <section className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Revenue dashboards</p>
+                <h2>Omsætningsmål</h2>
+              </div>
+              <p className="muted">
+                Daglige mål for omsætnings-dashboards. For uge og måned skaleres målet automatisk med antal arbejdsdage i perioden.
+              </p>
+            </div>
+            <div className="settings-form-grid">
+              <div className="field">
+                <label htmlFor="revenue-target-arbeidstid">Dagligt mål – Omsætning arbejdstid (kr)</label>
+                <input
+                  defaultValue={revenueTargets.arbeidstid}
+                  id="revenue-target-arbeidstid"
+                  min="0"
+                  name="revenue_target_arbeidstid"
+                  step="1"
+                  type="number"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="revenue-target-repair">Dagligt mål – Omsætning reparationer (kr)</label>
+                <input
+                  defaultValue={revenueTargets.repair}
+                  id="revenue-target-repair"
+                  min="0"
+                  name="revenue_target_repair"
+                  step="1"
+                  type="number"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="revenue-target-cykelplus">Mål – CykelPlus kunder (antal)</label>
+                <input
+                  defaultValue={revenueTargets.cykelplus}
+                  id="revenue-target-cykelplus"
+                  min="0"
+                  name="revenue_target_cykelplus"
+                  step="1"
+                  type="number"
+                />
+              </div>
+            </div>
           </section>
         </form>
       </main>

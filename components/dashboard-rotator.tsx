@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { DashboardBoard, DashboardBarRow, DashboardFocusMetric } from "@/lib/data/dashboard";
+import type { DashboardBoard, DashboardBarRow, DashboardFocusMetric, DashboardRevenueBar } from "@/lib/data/dashboard";
 import { formatHours } from "@/lib/time";
 
 type DashboardRotatorProps = {
@@ -144,6 +144,45 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
   );
 }
 
+function formatCurrency(value: number): string {
+  return value.toLocaleString("da-DK", { maximumFractionDigits: 0 }) + " kr";
+}
+
+function RevenueBars({ bars }: { bars: DashboardRevenueBar[] }) {
+  if (bars.length === 0) {
+    return <p className="muted">Ingen data tilgængeligt.</p>;
+  }
+
+  return (
+    <div className="bars">
+      {bars.map((bar) => {
+        const chartMax = getTargetScaleMax(bar.targetValue);
+        const fillRatio = clampBarHeight(bar.value, chartMax);
+        const pct = bar.targetValue > 0 ? bar.value / bar.targetValue : 0;
+
+        return (
+          <article className="bar-card" key={bar.key}>
+            <div className="bar-track">
+              {bar.targetValue > 0 && (
+                <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
+              )}
+              <div className="bar-fill" style={{ height: `${Math.max(fillRatio, bar.value > 0 ? 4 : 0)}%`, ...barStyle(pct) }}>
+                {bar.value > 0 && !bar.isCurrency ? bar.value.toFixed(0) : ""}
+              </div>
+              {bar.value > 0 && (
+                <div className="bar-value-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
+                  {bar.isCurrency ? formatCurrency(bar.value) : bar.value.toFixed(0)}
+                </div>
+              )}
+            </div>
+            <div className="bar-label">{bar.label}</div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function DashboardBoardView({ board, lastUpdatedLabel }: { board: DashboardBoard | null; lastUpdatedLabel: string }) {
   if (!board) {
     return (
@@ -173,7 +212,9 @@ function DashboardBoardView({ board, lastUpdatedLabel }: { board: DashboardBoard
       </header>
 
       <section className="chart-shell">
-        {board.kind === "period" ? (
+        {board.kind === "revenue" ? (
+          <RevenueBars bars={board.bars} />
+        ) : board.kind === "period" ? (
           <PeriodBars rows={board.rows} />
         ) : board.mechanics.length > 0 ? (
           <div className="focus-groups">

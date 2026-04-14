@@ -332,6 +332,36 @@ export async function updateDashboardViewSettingAction(formData: FormData) {
   redirectWithMessage("Dashboard-indstilling gemt.", "success");
 }
 
+export async function saveRevenueTargetsAction(formData: FormData) {
+  const user = await getCurrentUserOrNull();
+  if (!user) {
+    redirect("/login?redirect=/settings");
+  }
+
+  const arbeidstid = readNumber(formData, "revenue_target_arbeidstid", 0);
+  const repair = readNumber(formData, "revenue_target_repair", 0);
+  const cykelplus = readNumber(formData, "revenue_target_cykelplus", 0);
+
+  const now = new Date().toISOString();
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.from("revenue_kpi_targets").upsert(
+    [
+      { metric_key: "arbeidstid", daily_target: arbeidstid, updated_at: now },
+      { metric_key: "repair", daily_target: repair, updated_at: now },
+      { metric_key: "cykelplus", daily_target: cykelplus, updated_at: now },
+    ],
+    { onConflict: "metric_key" },
+  );
+
+  if (error) {
+    redirectWithMessage(error.message, "error");
+  }
+
+  revalidateViews();
+  redirectWithMessage("Omsætningsmål gemt.", "success");
+}
+
 export async function bulkUpdateDashboardViewSettingsAction(formData: FormData) {
   const user = await getCurrentUserOrNull();
   if (!user) {
