@@ -185,7 +185,20 @@ type MockCustomersFirstClient = {
   listAllTicketMaterialsForTicket: ReturnType<typeof vi.fn>;
   listAllUpdatedPayments: ReturnType<typeof vi.fn>;
   getCykelPlusCustomerCount: ReturnType<typeof vi.fn>;
+  getTicketById: ReturnType<typeof vi.fn>;
 };
+
+function createMockClient(overrides: Partial<MockCustomersFirstClient> = {}): MockCustomersFirstClient {
+  return {
+    listAllUpdatedTickets: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    listAllUpdatedTicketMaterials: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    listAllTicketMaterialsForTicket: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    listAllUpdatedPayments: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    getCykelPlusCustomerCount: vi.fn(async () => 0),
+    getTicketById: vi.fn(async () => null),
+    ...overrides,
+  };
+}
 
 async function loadSyncModule(state: DbState, client: MockCustomersFirstClient) {
   vi.resetModules();
@@ -278,13 +291,10 @@ describe("runPhaseOneSync", () => {
       raw: {},
     };
 
-    const client: MockCustomersFirstClient = {
-      listAllUpdatedTickets: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    const client = createMockClient({
       listAllUpdatedTicketMaterials: vi.fn(async () => ({ normalizedItems: [material], httpCalls: 1 })),
       listAllTicketMaterialsForTicket: vi.fn(async () => ({ normalizedItems: [material], httpCalls: 1 })),
-      listAllUpdatedPayments: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
-      getCykelPlusCustomerCount: vi.fn(async () => 0),
-    };
+    });
 
     const { runPhaseOneSync } = await loadSyncModule(state, client);
     const result = await runPhaseOneSync("sync");
@@ -375,10 +385,7 @@ describe("runPhaseOneSync", () => {
       cykelplus_snapshots: [],
     };
 
-    const client: MockCustomersFirstClient = {
-      listAllUpdatedTickets: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
-      listAllUpdatedTicketMaterials: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
-      listAllTicketMaterialsForTicket: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    const client = createMockClient({
       listAllUpdatedPayments: vi.fn(async () => ({
         normalizedItems: [
           {
@@ -404,7 +411,7 @@ describe("runPhaseOneSync", () => {
         httpCalls: 1,
       })),
       getCykelPlusCustomerCount: vi.fn(async () => 12),
-    };
+    });
 
     const { runPhaseOneSync } = await loadSyncModule(state, client);
     await runPhaseOneSync("sync");
@@ -435,6 +442,237 @@ describe("runPhaseOneSync", () => {
           customer_count: 12,
         }),
       ]),
+    );
+  });
+
+  it("bootstraps a 7 day payment backfill when summary is empty", async () => {
+    const state: DbState = {
+      mechanic_item_mapping: [
+        {
+          id: "m-1",
+          mechanic_name: "Alice",
+          mechanic_item_no: "MEK-ALICE",
+          display_order: 0,
+          active: true,
+        },
+      ],
+      daily_ticket_item_baselines: [],
+      daily_mechanic_totals: [],
+      sync_event_log: [
+        {
+          id: "previous-sync",
+          sync_type: "sync",
+          status: "completed",
+          finished_at: "2026-04-14T20:15:00.000Z",
+        },
+      ],
+      ticket_type_cache: [],
+      daily_payment_summary: [],
+      cykelplus_snapshots: [],
+    };
+
+    const client = createMockClient({
+      listAllUpdatedPayments: vi.fn(async () => ({
+        normalizedItems: [
+          {
+            paymentId: 500,
+            paymentDate: "2026-04-14",
+            totalSum: 450,
+            taskIds: [],
+            articles: [{ productNo: "MEK-ALICE", quantity: 1, totalInclVat: 450 }],
+            raw: {},
+          },
+        ],
+        httpCalls: 1,
+      })),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const result = await runPhaseOneSync("sync");
+
+    expect(client.listAllUpdatedPayments).toHaveBeenCalledWith("2026-04-08 00:00:00");
+    expect(result.payment).toEqual(
+      expect.objectContaining({
+        paymentsSeen: 1,
+        paymentsUpserted: 1,
+        paymentUpdatedAfter: "2026-04-08 00:00:00",
+        paymentBackfillWindowDays: 7,
+      }),
+    );
+    expect(state.daily_payment_summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payment_id: 500,
+          payment_date: "2026-04-14",
+          mechanic_total_incl_vat: 450,
+          ticket_total_incl_vat: 450,
+        }),
+      ]),
+    );
+  });
+
+  it("uses direct ticket lookup as the final repair fallback and seeds ticket_type_cache", async () => {
+    const state: DbState = {
+      mechanic_item_mapping: [
+        {
+          id: "m-1",
+          mechanic_name: "Alice",
+          mechanic_item_no: "MEK-ALICE",
+          display_order: 0,
+          active: true,
+        },
+      ],
+      daily_ticket_item_baselines: [],
+      daily_mechanic_totals: [],
+      sync_event_log: [],
+      ticket_type_cache: [],
+      daily_payment_summary: [],
+      cykelplus_snapshots: [],
+    };
+
+    const client = createMockClient({
+      listAllUpdatedPayments: vi.fn(async () => ({
+        normalizedItems: [
+          {
+            paymentId: 610,
+            paymentDate: "2026-04-14",
+            totalSum: 900,
+            taskIds: [8408718],
+            articles: [
+              { productNo: "MEK-ALICE", quantity: 1, totalInclVat: 300 },
+              { productNo: "PART-1", quantity: 1, totalInclVat: 600 },
+            ],
+            raw: {},
+          },
+        ],
+        httpCalls: 1,
+      })),
+      getTicketById: vi.fn(async (ticketId: number) => ({
+        ticketId,
+        ticketType: "repair",
+        updatedAt: "2026-04-14T09:00:00.000Z",
+        createdAt: "2026-04-14T08:00:00.000Z",
+        raw: {},
+      })),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    await runPhaseOneSync("sync");
+
+    expect(client.getTicketById).toHaveBeenCalledWith(8408718);
+    expect(state.daily_payment_summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          payment_id: 610,
+          is_repair: true,
+        }),
+      ]),
+    );
+    expect(state.ticket_type_cache).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_id: 8408718,
+          ticket_type: "repair",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps payments_backfill idempotent on payment_id", async () => {
+    const state: DbState = {
+      mechanic_item_mapping: [
+        {
+          id: "m-1",
+          mechanic_name: "Alice",
+          mechanic_item_no: "MEK-ALICE",
+          display_order: 0,
+          active: true,
+        },
+      ],
+      daily_ticket_item_baselines: [],
+      daily_mechanic_totals: [],
+      sync_event_log: [],
+      ticket_type_cache: [],
+      daily_payment_summary: [],
+      cykelplus_snapshots: [],
+    };
+
+    const client = createMockClient({
+      listAllUpdatedPayments: vi.fn(async () => ({
+        normalizedItems: [
+          {
+            paymentId: 700,
+            paymentDate: "2026-04-14",
+            totalSum: 300,
+            taskIds: [],
+            articles: [{ productNo: "MEK-ALICE", quantity: 1, totalInclVat: 300 }],
+            raw: {},
+          },
+        ],
+        httpCalls: 1,
+      })),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    await runPhaseOneSync("payments_backfill");
+    await runPhaseOneSync("payments_backfill");
+
+    expect(client.listAllUpdatedTickets).not.toHaveBeenCalled();
+    expect(client.getCykelPlusCustomerCount).not.toHaveBeenCalled();
+    expect(state.daily_payment_summary).toHaveLength(1);
+    expect(state.daily_payment_summary[0]).toEqual(
+      expect.objectContaining({
+        payment_id: 700,
+      }),
+    );
+  });
+
+  it("surfaces payment errors as sync warnings in sync_event_log", async () => {
+    const state: DbState = {
+      mechanic_item_mapping: [
+        {
+          id: "m-1",
+          mechanic_name: "Alice",
+          mechanic_item_no: "MEK-ALICE",
+          display_order: 0,
+          active: true,
+        },
+      ],
+      daily_ticket_item_baselines: [],
+      daily_mechanic_totals: [],
+      sync_event_log: [],
+      ticket_type_cache: [],
+      daily_payment_summary: [],
+      cykelplus_snapshots: [],
+    };
+
+    const client = createMockClient({
+      listAllUpdatedPayments: vi.fn(async () => {
+        throw new Error("payment exploded");
+      }),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const result = await runPhaseOneSync("sync");
+
+    expect(result.payment).toEqual(
+      expect.objectContaining({
+        paymentError: expect.stringContaining("payment exploded"),
+      }),
+    );
+
+    const syncLog = state.sync_event_log.find((row) => row.id === result.syncLogId);
+    expect(syncLog).toEqual(
+      expect.objectContaining({
+        status: "completed_with_warning",
+        message: "sync completed with payment warning",
+      }),
+    );
+    expect(syncLog?.details_json).toEqual(
+      expect.objectContaining({
+        payment_error: expect.stringContaining("payment exploded"),
+        payment_backfill_window_days: 7,
+      }),
     );
   });
 });

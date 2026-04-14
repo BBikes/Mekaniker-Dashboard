@@ -9,6 +9,8 @@ import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
 const SYNC_CURSOR_OVERLAP_MINUTES = 2;
+const DEFAULT_PAYMENT_BACKFILL_DAYS = 7;
+const SUCCESSFUL_SYNC_STATUSES = ["completed", "completed_with_warning"] as const;
 
 type MechanicMapping = {
   id: string;
@@ -33,13 +35,24 @@ type DailyBaselineRow = {
   last_seen_at: string | null;
 };
 
-export type SyncMode = "baseline" | "sync";
-type MaterialSyncLogType = SyncMode;
-type SyncLogType = MaterialSyncLogType | "scheduled";
+export type SyncMode = "baseline" | "sync" | "payments_backfill";
+type MaterialSyncLogType = Extract<SyncMode, "baseline" | "sync">;
+type SyncLogType = SyncMode | "scheduled";
+
+export type PaymentSyncMetrics = {
+  httpCalls: number;
+  paymentsSeen: number;
+  paymentsUpserted: number;
+  paymentUpdatedAfter: string;
+  paymentBackfillWindowDays: number | null;
+  paymentError: string | null;
+  ticketLookupCount: number;
+  ticketLookupMissCount: number;
+};
 
 export type SyncResult = {
   syncLogId: string;
-  mode: MaterialSyncLogType;
+  mode: SyncMode;
   statDate: string;
   httpCalls: number;
   materialsSeen: number;
@@ -53,6 +66,7 @@ export type SyncResult = {
     affectedMechanicIds: string[];
     visibilityAnomalies: number[];
   };
+  payment: PaymentSyncMetrics | null;
 };
 
 type ScheduledMetrics = {
@@ -104,6 +118,10 @@ function rewindIsoTimestamp(timestamp: string, minutes: number) {
 
   parsed.setUTCMinutes(parsed.getUTCMinutes() - minutes);
   return parsed.toISOString();
+}
+
+function combineSyncMessages(current: string | null, next: string) {
+  return current ? `${current}; ${next}` : next;
 }
 
 function resolveMaterialStatDate(material: NormalizedTicketMaterial, fallbackDate?: string | null) {
@@ -232,7 +250,7 @@ export async function startScheduledSyncRun(lockWindowMinutes = SCHEDULED_SYNC_L
     .from("sync_event_log")
     .select("id, sync_type, started_at")
     .eq("status", "running")
-    .in("sync_type", ["scheduled", "baseline", "sync"])
+    .in("sync_type", ["scheduled", "baseline", "sync", "payments_backfill"])
     .gte("started_at", threshold)
     .order("started_at", { ascending: false })
     .limit(1)
@@ -472,13 +490,215 @@ async function loadLatestBaselineTicketTypes(ticketIds: number[]) {
   return ticketTypes;
 }
 
+async function loadCachedTicketTypes(ticketIds: number[]) {
+  if (ticketIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("ticket_type_cache")
+    .select("ticket_id, ticket_type")
+    .in("ticket_id", ticketIds);
+
+  if (error) {
+    throw new Error(`Failed to load ticket type cache: ${error.message}`);
+  }
+
+  const cachedTicketTypes = new Map<number, string>();
+  for (const row of (data ?? []) as Array<{ ticket_id: number; ticket_type: string | null }>) {
+    if (!row.ticket_type) {
+      continue;
+    }
+
+    cachedTicketTypes.set(row.ticket_id, row.ticket_type);
+  }
+
+  return cachedTicketTypes;
+}
+
+async function upsertTicketTypeCache(ticketTypes: Map<number, string>, updatedAt: string) {
+  if (ticketTypes.size === 0) {
+    return 0;
+  }
+
+  const supabase = createAdminClient();
+  const upserts = [...ticketTypes.entries()].map(([ticketId, ticketType]) => ({
+    ticket_id: ticketId,
+    ticket_type: ticketType,
+    updated_at: updatedAt,
+  }));
+
+  const { error } = await supabase.from("ticket_type_cache").upsert(upserts, {
+    onConflict: "ticket_id",
+  });
+
+  if (error) {
+    throw new Error(`Failed to upsert ticket_type_cache: ${error.message}`);
+  }
+
+  return upserts.length;
+}
+
+async function hasAnyPaymentSummaryRows() {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("daily_payment_summary")
+    .select("payment_id")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to inspect daily_payment_summary: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
+function getPaymentBackfillWindowStart(days: number) {
+  const normalizedDays = Math.max(1, Math.trunc(days));
+  return atStartOfDay(dateDaysAgo(normalizedDays - 1));
+}
+
+async function resolvePaymentUpdatedAfter(mode: SyncMode, fallbackUpdatedAfter: string, paymentBackfillDays: number) {
+  if (mode === "payments_backfill") {
+    return {
+      paymentUpdatedAfter: getPaymentBackfillWindowStart(paymentBackfillDays),
+      paymentBackfillWindowDays: paymentBackfillDays,
+    };
+  }
+
+  const hasPaymentSummary = await hasAnyPaymentSummaryRows();
+  if (!hasPaymentSummary) {
+    return {
+      paymentUpdatedAfter: getPaymentBackfillWindowStart(paymentBackfillDays),
+      paymentBackfillWindowDays: paymentBackfillDays,
+    };
+  }
+
+  return {
+    paymentUpdatedAfter: fallbackUpdatedAfter,
+    paymentBackfillWindowDays: null,
+  };
+}
+
+async function syncPayments({
+  client,
+  paymentUpdatedAfter,
+  paymentBackfillWindowDays,
+  ticketTypeByTicketId,
+  mappingByItemNo,
+  now,
+  statDate,
+}: {
+  client: CustomersFirstClient;
+  paymentUpdatedAfter: string;
+  paymentBackfillWindowDays: number | null;
+  ticketTypeByTicketId: Map<number, string>;
+  mappingByItemNo: Map<string, MechanicMapping>;
+  now: string;
+  statDate: string;
+}): Promise<PaymentSyncMetrics> {
+  const updatedPayments = await client.listAllUpdatedPayments(paymentUpdatedAfter);
+  const allTaskIds = [...new Set(updatedPayments.normalizedItems.flatMap((payment) => payment.taskIds))];
+  const [cachedTicketTypes, baselineTicketTypes] = await Promise.all([
+    loadCachedTicketTypes(allTaskIds),
+    loadLatestBaselineTicketTypes(allTaskIds),
+  ]);
+
+  const resolvedTicketTypes = new Map<number, string>();
+  for (const [ticketId, ticketType] of ticketTypeByTicketId.entries()) {
+    resolvedTicketTypes.set(ticketId, ticketType);
+  }
+
+  for (const [ticketId, ticketType] of cachedTicketTypes.entries()) {
+    if (!resolvedTicketTypes.has(ticketId)) {
+      resolvedTicketTypes.set(ticketId, ticketType);
+    }
+  }
+
+  for (const [ticketId, ticketType] of baselineTicketTypes.entries()) {
+    if (!resolvedTicketTypes.has(ticketId)) {
+      resolvedTicketTypes.set(ticketId, ticketType);
+    }
+  }
+
+  const missingTaskIds = allTaskIds.filter((ticketId) => !resolvedTicketTypes.has(ticketId));
+  const lookedUpTicketTypes = new Map<number, string>();
+  let ticketLookupMissCount = 0;
+
+  for (const ticketId of missingTaskIds) {
+    const ticket = await client.getTicketById(ticketId);
+    const ticketType = ticket?.ticketType ?? null;
+
+    if (!ticketType) {
+      ticketLookupMissCount += 1;
+      continue;
+    }
+
+    resolvedTicketTypes.set(ticketId, ticketType);
+    lookedUpTicketTypes.set(ticketId, ticketType);
+  }
+
+  if (lookedUpTicketTypes.size > 0) {
+    await upsertTicketTypeCache(lookedUpTicketTypes, now);
+  }
+
+  const paymentUpserts = updatedPayments.normalizedItems.map((payment) => {
+    const paymentDate = payment.paymentDate ?? statDate;
+    let mechanicTotal = 0;
+    let ticketTotal = 0;
+
+    for (const article of payment.articles) {
+      ticketTotal += article.totalInclVat;
+      const productNo = article.productNo?.trim() ?? null;
+      if (productNo && mappingByItemNo.has(productNo)) {
+        mechanicTotal += article.totalInclVat;
+      }
+    }
+
+    const isRepair = payment.taskIds.some((ticketId) => resolvedTicketTypes.get(ticketId) === "repair");
+
+    return {
+      payment_id: payment.paymentId,
+      payment_date: paymentDate,
+      mechanic_total_incl_vat: roundNumber(mechanicTotal),
+      ticket_total_incl_vat: roundNumber(ticketTotal),
+      is_repair: isRepair,
+      updated_at: now,
+    };
+  });
+
+  if (paymentUpserts.length > 0) {
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("daily_payment_summary").upsert(paymentUpserts, {
+      onConflict: "payment_id",
+    });
+
+    if (error) {
+      throw new Error(`Failed to upsert daily_payment_summary: ${error.message}`);
+    }
+  }
+
+  return {
+    httpCalls: updatedPayments.httpCalls + missingTaskIds.length,
+    paymentsSeen: updatedPayments.normalizedItems.length,
+    paymentsUpserted: paymentUpserts.length,
+    paymentUpdatedAfter,
+    paymentBackfillWindowDays,
+    paymentError: null,
+    ticketLookupCount: missingTaskIds.length,
+    ticketLookupMissCount,
+  };
+}
+
 async function getLastSuccessfulSyncTimestamp() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("sync_event_log")
     .select("finished_at")
     .eq("sync_type", "sync")
-    .eq("status", "completed")
+    .in("status", [...SUCCESSFUL_SYNC_STATUSES])
     .order("finished_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -523,12 +743,16 @@ export async function probeCustomersFirstTicketMaterials() {
 }
 
 
-export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
+export async function runPhaseOneSync(
+  mode: SyncMode,
+  options: { paymentBackfillDays?: number } = {},
+): Promise<SyncResult> {
   const syncLogId = await createSyncLog(mode);
 
   try {
     const statDate = getCopenhagenDateString();
     const now = toIsoTimestamp();
+    const paymentBackfillDays = Math.max(1, Math.trunc(options.paymentBackfillDays ?? DEFAULT_PAYMENT_BACKFILL_DAYS));
 
     if (mode === "baseline") {
       const carryForwardRows = await loadCarryForwardRows(statDate);
@@ -581,6 +805,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           affectedMechanicIds,
           visibilityAnomalies: [],
         },
+        payment: null,
       };
 
       await completeSyncLog(syncLogId, {
@@ -598,179 +823,191 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       return result;
     }
 
-    const updatedAfter = await getLastSuccessfulSyncTimestamp();
-    const [mappings, todayRows] = await Promise.all([fetchActiveMappings(), loadRowsForDate(statDate)]);
+    const materialUpdatedAfter = mode === "sync" ? await getLastSuccessfulSyncTimestamp() : atStartOfDay(statDate);
+    const paymentWindow = await resolvePaymentUpdatedAfter(mode, materialUpdatedAfter, paymentBackfillDays);
+    const mappings = await fetchActiveMappings();
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
-    const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
     const client = new CustomersFirstClient();
-    const updatedTicketsPromise = client.listAllUpdatedTickets(updatedAfter);
-    let updatedMaterialDiscovery: { normalizedItems: NormalizedTicketMaterial[]; httpCalls: number } = {
-      normalizedItems: [],
-      httpCalls: 0,
-    };
-
-    try {
-      updatedMaterialDiscovery = await client.listAllUpdatedTicketMaterials(updatedAfter);
-    } catch (error) {
-      console.warn(`Material delta sync fell back to ticket sync: ${error instanceof Error ? error.message : String(error)}`);
-    }
-
-    const updatedTickets = await updatedTicketsPromise;
-    const ticketTypeByTicketId = new Map(
-      updatedTickets.normalizedItems
-        .filter((ticket) => ticket.ticketType !== null)
-        .map((ticket) => [ticket.ticketId, ticket.ticketType as string]),
-    );
-    const changedTicketIds = new Set([
-      ...updatedTickets.normalizedItems.map((ticket) => ticket.ticketId),
-      ...updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketId),
-    ]);
-    const ticketMaterials = await fetchTicketScopedMaterials([...changedTicketIds]);
-    const allMaterials = [...ticketMaterials.materialsByTicketId.values()].flatMap((materials) => materials);
-    const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
-      statDate,
-      [...new Set(allMaterials.map((material) => material.ticketMaterialId))],
-    );
+    const ticketTypeByTicketId = new Map<number, string>();
     const unmappedProductNos = new Set<string>();
     const affectedMechanicIds = new Set<string>();
-    const seenMaterialIds = new Set<number>();
     const visibilityAnomalies: number[] = [];
-    let missingProductNoCount = 0;
+    let updatedTickets = { normalizedItems: [] as Array<{ ticketId: number; ticketType: string | null }>, httpCalls: 0 };
+    let materialDiscoveryHttpCalls = 0;
+    let materialHttpCalls = 0;
+    let materialsSeen = 0;
+    let mappedMaterialsSeen = 0;
+    let rowsUpserted = 0;
     let rowsCorrected = 0;
     let anomalyCount = 0;
-    let mappedMaterialsSeen = 0;
+    let missingProductNoCount = 0;
+    let paymentWarning: string | null = null;
+    const updatedAfter = paymentWindow.paymentUpdatedAfter;
+    const supabase = createAdminClient();
 
-    const upserts = allMaterials.flatMap((material) => {
-      const productNo = material.productNo?.trim() ?? null;
-      if (!productNo) {
-        missingProductNoCount += 1;
-        return [];
+    if (mode === "sync") {
+      const [todayRows, fetchedUpdatedTickets] = await Promise.all([
+        loadRowsForDate(statDate),
+        client.listAllUpdatedTickets(materialUpdatedAfter),
+      ]);
+      const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
+      let updatedMaterialDiscovery: { normalizedItems: NormalizedTicketMaterial[]; httpCalls: number } = {
+        normalizedItems: [],
+        httpCalls: 0,
+      };
+
+      try {
+        updatedMaterialDiscovery = await client.listAllUpdatedTicketMaterials(materialUpdatedAfter);
+      } catch (error) {
+        console.warn(`Material delta sync fell back to ticket sync: ${error instanceof Error ? error.message : String(error)}`);
       }
 
-      const mapping = mappingByItemNo.get(productNo);
-      if (!mapping) {
-        unmappedProductNos.add(productNo);
-        return [];
-      }
+      updatedTickets = fetchedUpdatedTickets;
+      materialDiscoveryHttpCalls = updatedMaterialDiscovery.httpCalls;
+      updatedTickets.normalizedItems
+        .filter((ticket) => ticket.ticketType !== null)
+        .forEach((ticket) => ticketTypeByTicketId.set(ticket.ticketId, ticket.ticketType as string));
+      const changedTicketIds = new Set([
+      ...updatedTickets.normalizedItems.map((ticket) => ticket.ticketId),
+      ...updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketId),
+      ]);
+      const ticketMaterials = await fetchTicketScopedMaterials([...changedTicketIds]);
+      materialHttpCalls = ticketMaterials.httpCalls;
+      materialsSeen = ticketMaterials.materialsSeen;
+      const allMaterials = [...ticketMaterials.materialsByTicketId.values()].flatMap((materials) => materials);
+      const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
+        statDate,
+        [...new Set(allMaterials.map((material) => material.ticketMaterialId))],
+      );
+      const seenMaterialIds = new Set<number>();
 
-      mappedMaterialsSeen += 1;
-      seenMaterialIds.add(material.ticketMaterialId);
-      affectedMechanicIds.add(mapping.id);
-      const existingRow = existingRowsByMaterialId.get(material.ticketMaterialId) ?? previousRowsByMaterialId.get(material.ticketMaterialId);
-      const anomalyCode = buildBaselineAnomaly(existingRow, material, "sync");
+      const upserts = allMaterials.flatMap((material) => {
+        const productNo = material.productNo?.trim() ?? null;
+        if (!productNo) {
+          missingProductNoCount += 1;
+          return [];
+        }
 
-      if (anomalyCode !== null) {
-        anomalyCount += 1;
-        if (anomalyCode === "quantity_decreased" || anomalyCode === "below_baseline_correction") {
-          rowsCorrected += 1;
+        const mapping = mappingByItemNo.get(productNo);
+        if (!mapping) {
+          unmappedProductNos.add(productNo);
+          return [];
+        }
+
+        mappedMaterialsSeen += 1;
+        seenMaterialIds.add(material.ticketMaterialId);
+        affectedMechanicIds.add(mapping.id);
+        const existingRow = existingRowsByMaterialId.get(material.ticketMaterialId) ?? previousRowsByMaterialId.get(material.ticketMaterialId);
+        const anomalyCode = buildBaselineAnomaly(existingRow, material, "sync");
+
+        if (anomalyCode !== null) {
+          anomalyCount += 1;
+          if (anomalyCode === "quantity_decreased" || anomalyCode === "below_baseline_correction") {
+            rowsCorrected += 1;
+          }
+        }
+
+        const baselineQuantity = existingRowsByMaterialId.has(material.ticketMaterialId)
+          ? Number(existingRowsByMaterialId.get(material.ticketMaterialId)!.baseline_quantity)
+          : existingRow
+            ? Number(existingRow.current_quantity)
+            : 0;
+        const currentQuantity = material.amount;
+        const todayAddedQuantity = currentQuantity - baselineQuantity;
+
+        return [
+          {
+            stat_date: statDate,
+            ticket_material_id: material.ticketMaterialId,
+            ticket_id: material.ticketId,
+            mechanic_id: mapping.id,
+            mechanic_item_no: mapping.mechanic_item_no,
+            baseline_quantity: roundNumber(baselineQuantity),
+            current_quantity: roundNumber(currentQuantity),
+            today_added_quantity: roundNumber(todayAddedQuantity),
+            today_added_hours: roundNumber(todayAddedQuantity * 0.25),
+            source_updated_at: material.updatedAt ?? existingRow?.source_updated_at ?? null,
+            source_payment_id: material.paymentId,
+            source_amountpaid: material.amountPaid,
+            ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? existingRow?.ticket_type ?? null,
+            line_total_incl_vat: material.totalInclVat ?? null,
+            last_seen_at: now,
+            anomaly_code: anomalyCode,
+            updated_at: now,
+          },
+        ];
+      });
+
+      const supabase = createAdminClient();
+      if (upserts.length > 0) {
+        const { error } = await supabase.from("daily_ticket_item_baselines").upsert(upserts, {
+          onConflict: "stat_date,ticket_material_id",
+        });
+
+        if (error) {
+          throw new Error(`Failed to upsert daily baseline rows: ${error.message}`);
         }
       }
 
-      const baselineQuantity = existingRowsByMaterialId.has(material.ticketMaterialId)
-        ? Number(existingRowsByMaterialId.get(material.ticketMaterialId)!.baseline_quantity)
-        : existingRow
-          ? Number(existingRow.current_quantity)
-          : 0;
-      const currentQuantity = material.amount;
-      const todayAddedQuantity = currentQuantity - baselineQuantity;
+      rowsUpserted = upserts.length;
 
-      return [
-        {
-          stat_date: statDate,
-          ticket_material_id: material.ticketMaterialId,
-          ticket_id: material.ticketId,
-          mechanic_id: mapping.id,
-          mechanic_item_no: mapping.mechanic_item_no,
-          baseline_quantity: roundNumber(baselineQuantity),
-          current_quantity: roundNumber(currentQuantity),
-          today_added_quantity: roundNumber(todayAddedQuantity),
-          today_added_hours: roundNumber(todayAddedQuantity * 0.25),
-          source_updated_at: material.updatedAt ?? existingRow?.source_updated_at ?? null,
-          source_payment_id: material.paymentId,
-          source_amountpaid: material.amountPaid,
-          ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? existingRow?.ticket_type ?? null,
-          line_total_incl_vat: material.totalInclVat ?? null,
-          last_seen_at: now,
-          anomaly_code: anomalyCode,
-          updated_at: now,
-        },
-      ];
-    });
+      const invisibleRows = todayRows.filter((row) => changedTicketIds.has(row.ticket_id) && !seenMaterialIds.has(row.ticket_material_id));
+      if (invisibleRows.length > 0) {
+        visibilityAnomalies.push(...invisibleRows.map((row) => row.ticket_material_id));
+        anomalyCount += invisibleRows.length;
+        rowsCorrected += invisibleRows.length;
 
-    const supabase = createAdminClient();
-    if (upserts.length > 0) {
-      const { error } = await supabase.from("daily_ticket_item_baselines").upsert(upserts, {
-        onConflict: "stat_date,ticket_material_id",
-      });
+        const invisibleUpserts = invisibleRows.map((row) => {
+          const baselineQuantity = Number(row.baseline_quantity);
+          const todayAddedQuantity = 0 - baselineQuantity;
 
-      if (error) {
-        throw new Error(`Failed to upsert daily baseline rows: ${error.message}`);
+          affectedMechanicIds.add(row.mechanic_id as string);
+
+          return {
+            stat_date: statDate,
+            ticket_material_id: row.ticket_material_id,
+            ticket_id: row.ticket_id,
+            mechanic_id: row.mechanic_id,
+            mechanic_item_no: row.mechanic_item_no,
+            baseline_quantity: roundNumber(baselineQuantity),
+            current_quantity: 0,
+            today_added_quantity: roundNumber(todayAddedQuantity),
+            today_added_hours: roundNumber(todayAddedQuantity * 0.25),
+            source_updated_at: row.source_updated_at,
+            source_payment_id: row.source_payment_id,
+            source_amountpaid: row.source_amountpaid,
+            ticket_type: row.ticket_type ?? null,
+            last_seen_at: now,
+            anomaly_code: "missing_in_latest_fetch",
+            updated_at: now,
+          };
+        });
+
+        const { error } = await supabase.from("daily_ticket_item_baselines").upsert(invisibleUpserts, {
+          onConflict: "stat_date,ticket_material_id",
+        });
+
+        if (error) {
+          throw new Error(`Failed to flag visibility anomalies and update quantities: ${error.message}`);
+        }
       }
-    }
 
-    const invisibleRows = todayRows.filter((row) => changedTicketIds.has(row.ticket_id) && !seenMaterialIds.has(row.ticket_material_id));
-    if (invisibleRows.length > 0) {
-      visibilityAnomalies.push(...invisibleRows.map((row) => row.ticket_material_id));
-      anomalyCount += invisibleRows.length;
-      rowsCorrected += invisibleRows.length;
+      await recalculateTotals(statDate);
 
-      const invisibleUpserts = invisibleRows.map((row) => {
-        const baselineQuantity = Number(row.baseline_quantity);
-        const todayAddedQuantity = 0 - baselineQuantity;
-        
-        affectedMechanicIds.add(row.mechanic_id as string);
-
-        return {
-          stat_date: statDate,
-          ticket_material_id: row.ticket_material_id,
-          ticket_id: row.ticket_id,
-          mechanic_id: row.mechanic_id,
-          mechanic_item_no: row.mechanic_item_no,
-          baseline_quantity: roundNumber(baselineQuantity),
-          current_quantity: 0,
-          today_added_quantity: roundNumber(todayAddedQuantity),
-          today_added_hours: roundNumber(todayAddedQuantity * 0.25),
-          source_updated_at: row.source_updated_at,
-          source_payment_id: row.source_payment_id,
-          source_amountpaid: row.source_amountpaid,
-          ticket_type: row.ticket_type ?? null,
-          last_seen_at: now,
-          anomaly_code: "missing_in_latest_fetch",
-          updated_at: now,
-        };
-      });
-
-      const { error } = await supabase.from("daily_ticket_item_baselines").upsert(invisibleUpserts, {
-        onConflict: "stat_date,ticket_material_id",
-      });
-
-      if (error) {
-        throw new Error(`Failed to flag visibility anomalies and update quantities: ${error.message}`);
+      if (ticketTypeByTicketId.size > 0) {
+        try {
+          await upsertTicketTypeCache(ticketTypeByTicketId, now);
+        } catch (error) {
+          paymentWarning = combineSyncMessages(
+            paymentWarning,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       }
-    }
 
-    await recalculateTotals(statDate);
-
-    // --- Update ticket_type_cache for all tickets seen in this sync ---
-    if (ticketTypeByTicketId.size > 0) {
-      const ticketTypeCacheUpserts = [...ticketTypeByTicketId.entries()].map(([ticketId, ticketType]) => ({
-        ticket_id: ticketId,
-        ticket_type: ticketType,
-        updated_at: now,
-      }));
-
-      const { error: cacheError } = await supabase.from("ticket_type_cache").upsert(ticketTypeCacheUpserts, {
-        onConflict: "ticket_id",
-      });
-
-      if (cacheError) {
-        // Non-critical for existing mechanic tracking, but log it
-        console.warn(`Failed to upsert ticket_type_cache: ${cacheError.message}`);
-      }
-    }
-
-    // --- Fetch POS payments updated since last sync and store by actual payment date ---
-    try {
+    if (false) {
+      // Legacy payment sync path kept inert while the new backfill-aware flow runs below.
+      try {
       const updatedPayments = await client.listAllUpdatedPayments(updatedAfter);
 
       if (updatedPayments.normalizedItems.length > 0) {
@@ -787,7 +1024,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
 
           for (const row of (cachedRows ?? []) as Array<{ ticket_id: number; ticket_type: string | null }>) {
             if (row.ticket_type) {
-              cachedTicketTypes.set(row.ticket_id, row.ticket_type);
+              cachedTicketTypes.set(row.ticket_id, row.ticket_type as string);
             }
           }
         }
@@ -835,18 +1072,22 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           });
 
           if (paymentError) {
-            throw new Error(`Failed to upsert daily_payment_summary: ${paymentError.message}`);
+            throw new Error(`Failed to upsert daily_payment_summary: ${paymentError?.message ?? "unknown error"}`);
           }
         }
       }
-    } catch (paymentError) {
+    } catch (caughtPaymentError) {
       // Payment sync is non-critical for mechanic hour tracking – log but don't fail the sync
-      console.warn(`Payment sync step failed: ${paymentError instanceof Error ? paymentError.message : String(paymentError)}`);
+      const paymentErrorMessage = caughtPaymentError instanceof Error ? (caughtPaymentError as Error).message : String(caughtPaymentError);
+      console.warn(`Payment sync step failed: ${paymentErrorMessage}`);
+    }
+
     }
 
     // Update CykelPlus customer count snapshot
-    try {
-      const config = getServerConfig();
+    if (mode === "sync") {
+      try {
+        const config = getServerConfig();
       const cykelPlusCount = await client.getCykelPlusCustomerCount(config.cykelPlusTag);
       const supabaseCykelPlus = createAdminClient();
       await supabaseCykelPlus.from("cykelplus_snapshots").upsert(
@@ -857,14 +1098,56 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       // Non-critical – do not fail the sync if CykelPlus count fails
     }
 
+    }
+
+    }
+
+    let payment: PaymentSyncMetrics;
+    try {
+      payment = await syncPayments({
+        client,
+        paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
+        paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+        ticketTypeByTicketId,
+        mappingByItemNo,
+        now,
+        statDate,
+      });
+    } catch (error) {
+      const paymentError = error instanceof Error ? error.message : String(error);
+      payment = {
+        httpCalls: 0,
+        paymentsSeen: 0,
+        paymentsUpserted: 0,
+        paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
+        paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+        paymentError,
+        ticketLookupCount: 0,
+        ticketLookupMissCount: 0,
+      };
+
+      if (mode === "payments_backfill") {
+        throw error;
+      }
+
+      paymentWarning = combineSyncMessages(paymentWarning, paymentError);
+    }
+
+    if (paymentWarning) {
+      payment = {
+        ...payment,
+        paymentError: combineSyncMessages(payment.paymentError, paymentWarning),
+      };
+    }
+
     const result: SyncResult = {
       syncLogId,
       mode,
       statDate,
-      httpCalls: updatedTickets.httpCalls + updatedMaterialDiscovery.httpCalls + ticketMaterials.httpCalls,
-      materialsSeen: ticketMaterials.materialsSeen,
+      httpCalls: updatedTickets.httpCalls + materialDiscoveryHttpCalls + materialHttpCalls + payment.httpCalls,
+      materialsSeen,
       mappedMaterialsSeen,
-      rowsUpserted: upserts.length,
+      rowsUpserted,
       rowsCorrected,
       anomalyCount,
       details: {
@@ -873,20 +1156,28 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
         affectedMechanicIds: [...affectedMechanicIds],
         visibilityAnomalies,
       },
+      payment,
     };
 
     await completeSyncLog(syncLogId, {
-      status: "completed",
+      status: payment.paymentError ? "completed_with_warning" : "completed",
       http_calls: result.httpCalls,
       tickets_seen: updatedTickets.normalizedItems.length,
       materials_seen: result.materialsSeen,
       rows_upserted: result.rowsUpserted,
       rows_corrected: result.rowsCorrected,
       anomaly_count: result.anomalyCount,
-      message: `${mode} completed`,
+      message: payment.paymentError ? `${mode} completed with payment warning` : `${mode} completed`,
       details_json: {
         ...result.details,
-        updatedAfter,
+        updatedAfter: mode === "sync" ? materialUpdatedAfter : null,
+        payments_seen: payment.paymentsSeen,
+        payments_upserted: payment.paymentsUpserted,
+        payment_updated_after: payment.paymentUpdatedAfter,
+        payment_backfill_window_days: payment.paymentBackfillWindowDays,
+        payment_error: payment.paymentError,
+        ticket_lookup_count: payment.ticketLookupCount,
+        ticket_lookup_miss_count: payment.ticketLookupMissCount,
       },
     });
 

@@ -153,25 +153,20 @@ function readRetryDelayMs(response: Response, attempt: number) {
 export class CustomersFirstClient {
   private readonly config = getServerConfig();
 
-  private async requestPage<T>({
+  private async requestJson({
     path,
     params,
-    normalize,
-    paginationStart,
-    paginationPageLength,
+    returnNullOn404 = false,
   }: {
     path: string;
     params?: URLSearchParams;
-    normalize: (raw: Record<string, unknown>) => T | null;
-    paginationStart: number;
-    paginationPageLength: number;
-  }): Promise<PaginatedResult<T>> {
+    returnNullOn404?: boolean;
+  }): Promise<unknown | null> {
     const baseUrl = this.config.c1stApiBaseUrl.replace(/\/$/, "");
     const url = new URL(`${baseUrl}${path}`);
-    const searchParams = params ?? new URLSearchParams();
-    searchParams.set("paginationStart", String(paginationStart));
-    searchParams.set("paginationPageLength", String(paginationPageLength));
-    url.search = searchParams.toString();
+    if (params) {
+      url.search = params.toString();
+    }
 
     let response: Response | null = null;
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -187,6 +182,10 @@ export class CustomersFirstClient {
         break;
       }
 
+      if (returnNullOn404 && response.status === 404) {
+        return null;
+      }
+
       if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
         throw new Error(`Customers 1st request failed with ${response.status} ${response.statusText}`);
       }
@@ -198,7 +197,26 @@ export class CustomersFirstClient {
       throw new Error("Customers 1st request failed without a valid response.");
     }
 
-    const payload = (await response.json()) as unknown;
+    return (await response.json()) as unknown;
+  }
+
+  private async requestPage<T>({
+    path,
+    params,
+    normalize,
+    paginationStart,
+    paginationPageLength,
+  }: {
+    path: string;
+    params?: URLSearchParams;
+    normalize: (raw: Record<string, unknown>) => T | null;
+    paginationStart: number;
+    paginationPageLength: number;
+  }): Promise<PaginatedResult<T>> {
+    const searchParams = params ?? new URLSearchParams();
+    searchParams.set("paginationStart", String(paginationStart));
+    searchParams.set("paginationPageLength", String(paginationPageLength));
+    const payload = await this.requestJson({ path, params: searchParams });
     const rawItems = extractItemsFromUnknownPayload(payload);
     const normalizedItems = rawItems
       .map((item) => normalize(item))
@@ -476,5 +494,23 @@ export class CustomersFirstClient {
       normalizedItems: pages.flatMap((page) => page.normalizedItems),
       httpCalls: pages.length,
     };
+  }
+
+  async getTicketById(ticketId: number): Promise<NormalizedTicket | null> {
+    const payload = await this.requestJson({
+      path: `/tickets/${ticketId}`,
+      returnNullOn404: true,
+    });
+
+    if (payload === null) {
+      return null;
+    }
+
+    const record = asRecord(payload);
+    if (!record) {
+      return null;
+    }
+
+    return normalizeTicket(record);
   }
 }
