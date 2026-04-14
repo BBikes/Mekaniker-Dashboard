@@ -546,56 +546,32 @@ async function getRevenueKpiTargets(): Promise<Map<string, number>> {
   return map;
 }
 
-async function getRevenueTotals(
-  fromDate: string,
-  toDate: string,
-  hourlyRate: number,
-): Promise<{ arbeidstid: number; repair: number }> {
+async function getRevenueTotals(fromDate: string, toDate: string): Promise<{ arbeidstid: number; repair: number }> {
   const supabase = createAdminClient();
 
-  // Query real cash register totals from paid tickets
-  const [revenueResult, hoursResult] = await Promise.all([
-    supabase
-      .from("daily_ticket_revenue")
-      .select("mechanic_total_incl_vat, ticket_total_incl_vat")
-      .gte("stat_date", fromDate)
-      .lte("stat_date", toDate),
-    // Fallback: hours × rate used when no paid tickets exist yet in the period
-    supabase
-      .from("daily_mechanic_totals")
-      .select("hours_total")
-      .gte("stat_date", fromDate)
-      .lte("stat_date", toDate),
-  ]);
+  // Query payments by their actual payment_date (not sync date)
+  const { data, error } = await supabase
+    .from("daily_payment_summary")
+    .select("mechanic_total_incl_vat, ticket_total_incl_vat, is_repair")
+    .gte("payment_date", fromDate)
+    .lte("payment_date", toDate);
 
-  if (revenueResult.error) {
-    throw new Error(`Failed to load ticket revenue: ${revenueResult.error.message}`);
+  if (error) {
+    throw new Error(`Failed to load payment revenue: ${error.message}`);
   }
 
-  if (hoursResult.error) {
-    throw new Error(`Failed to load mechanic hours: ${hoursResult.error.message}`);
-  }
+  const rows = (data ?? []) as Array<{
+    mechanic_total_incl_vat: unknown;
+    ticket_total_incl_vat: unknown;
+    is_repair: unknown;
+  }>;
 
-  const rows = revenueResult.data ?? [];
+  const arbeidstid = rows.reduce((sum, row) => sum + toNumber(row.mechanic_total_incl_vat), 0);
+  const repair = rows
+    .filter((row) => Boolean(row.is_repair))
+    .reduce((sum, row) => sum + toNumber(row.ticket_total_incl_vat), 0);
 
-  const mechanicTotal = rows.reduce(
-    (sum, row) => sum + toNumber((row as { mechanic_total_incl_vat: unknown }).mechanic_total_incl_vat),
-    0,
-  );
-
-  const ticketTotal = rows.reduce(
-    (sum, row) => sum + toNumber((row as { ticket_total_incl_vat: unknown }).ticket_total_incl_vat),
-    0,
-  );
-
-  // Fall back to hours × rate if no paid tickets have been registered yet in the period
-  const totalHours = (hoursResult.data ?? []).reduce(
-    (sum, row) => sum + toNumber((row as { hours_total: unknown }).hours_total),
-    0,
-  );
-  const arbeidstid = mechanicTotal > 0 ? mechanicTotal : totalHours * hourlyRate;
-
-  return { arbeidstid, repair: ticketTotal };
+  return { arbeidstid, repair };
 }
 
 async function getLatestCykelPlusCount(): Promise<number> {
@@ -616,13 +592,11 @@ async function getLatestCykelPlusCount(): Promise<number> {
 
 async function buildRevenueBoard(setting: DashboardViewSetting, today: string): Promise<DashboardRevenueBoard> {
   const window = getDashboardWindow(setting.boardType, today);
-  const [cykelPlusCount, kpiTargets] = await Promise.all([
+  const [revenueTotals, cykelPlusCount, kpiTargets] = await Promise.all([
+    getRevenueTotals(window.fromDate, window.toDate),
     getLatestCykelPlusCount(),
     getRevenueKpiTargets(),
   ]);
-
-  const hourlyRate = kpiTargets.get("hourly_rate") ?? 450;
-  const revenueTotals = await getRevenueTotals(window.fromDate, window.toDate, hourlyRate);
 
   const periodWorkdays = countWeekdaysBetween(window.fromDate, window.toDate);
 

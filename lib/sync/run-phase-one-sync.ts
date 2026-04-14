@@ -688,64 +688,99 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       }
     }
 
-    // Compute per-ticket cash register totals from ALL materials (not just mechanic lines).
-    // Only saves rows for tickets that have been paid (at least one line has a paymentId).
-    const ticketRevenueUpserts: Array<{
-      stat_date: string;
-      ticket_id: number;
-      ticket_type: string | null;
-      payment_id: number | null;
-      mechanic_total_incl_vat: number;
-      ticket_total_incl_vat: number;
-      line_count: number;
-      updated_at: string;
-    }> = [];
+    await recalculateTotals(statDate);
 
-    for (const [ticketId, materials] of ticketMaterials.materialsByTicketId) {
-      // Determine if ticket has been paid
-      const paymentId = materials.find((m) => m.paymentId !== null)?.paymentId ?? null;
-      if (paymentId === null) {
-        continue; // Not yet through the register – skip
+    // --- Update ticket_type_cache for all tickets seen in this sync ---
+    if (ticketTypeByTicketId.size > 0) {
+      const ticketTypeCacheUpserts = [...ticketTypeByTicketId.entries()].map(([ticketId, ticketType]) => ({
+        ticket_id: ticketId,
+        ticket_type: ticketType,
+        updated_at: now,
+      }));
+
+      const { error: cacheError } = await supabase.from("ticket_type_cache").upsert(ticketTypeCacheUpserts, {
+        onConflict: "ticket_id",
+      });
+
+      if (cacheError) {
+        // Non-critical for existing mechanic tracking, but log it
+        console.warn(`Failed to upsert ticket_type_cache: ${cacheError.message}`);
       }
+    }
 
-      let mechanicTotal = 0;
-      let ticketTotal = 0;
-      let lineCount = 0;
+    // --- Fetch POS payments updated since last sync and store by actual payment date ---
+    try {
+      const updatedPayments = await client.listAllUpdatedPayments(updatedAfter);
 
-      for (const material of materials) {
-        const paid = material.amountPaid ?? 0;
-        ticketTotal += paid;
-        lineCount += 1;
+      if (updatedPayments.normalizedItems.length > 0) {
+        // Load ticket type cache for ALL task IDs referenced by these payments
+        const allTaskIds = [...new Set(updatedPayments.normalizedItems.flatMap((p) => p.taskIds))];
+        const cachedTicketTypes = new Map<number, string>();
 
-        const productNo = material.productNo?.trim() ?? null;
-        if (productNo && mappingByItemNo.has(productNo)) {
-          mechanicTotal += paid;
+        if (allTaskIds.length > 0) {
+          const { data: cachedRows } = await supabase
+            .from("ticket_type_cache")
+            .select("ticket_id, ticket_type")
+            .in("ticket_id", allTaskIds);
+
+          for (const row of (cachedRows ?? []) as Array<{ ticket_id: number; ticket_type: string | null }>) {
+            if (row.ticket_type) {
+              cachedTicketTypes.set(row.ticket_id, row.ticket_type);
+            }
+          }
+        }
+
+        const paymentUpserts = updatedPayments.normalizedItems.flatMap((payment) => {
+          // Payment date is required to bucket by correct day
+          const paymentDate = payment.paymentDate ?? statDate;
+
+          // Sum article totals: all articles → ticket total, mechanic-item articles → mechanic total
+          let mechanicTotal = 0;
+          let ticketTotal = 0;
+
+          for (const article of payment.articles) {
+            ticketTotal += article.totalInclVat;
+            const productNo = article.productNo?.trim() ?? null;
+            if (productNo && mappingByItemNo.has(productNo)) {
+              mechanicTotal += article.totalInclVat;
+            }
+          }
+
+          // Determine if this is a repair payment based on associated ticket types
+          const isRepair = payment.taskIds.some(
+            (id) =>
+              // From this sync's ticket data
+              ticketTypeByTicketId.get(id) === "repair" ||
+              // Or from the persisted cache
+              cachedTicketTypes.get(id) === "repair",
+          );
+
+          return [
+            {
+              payment_id: payment.paymentId,
+              payment_date: paymentDate,
+              mechanic_total_incl_vat: roundNumber(mechanicTotal),
+              ticket_total_incl_vat: roundNumber(ticketTotal),
+              is_repair: isRepair,
+              updated_at: now,
+            },
+          ];
+        });
+
+        if (paymentUpserts.length > 0) {
+          const { error: paymentError } = await supabase.from("daily_payment_summary").upsert(paymentUpserts, {
+            onConflict: "payment_id",
+          });
+
+          if (paymentError) {
+            throw new Error(`Failed to upsert daily_payment_summary: ${paymentError.message}`);
+          }
         }
       }
-
-      ticketRevenueUpserts.push({
-        stat_date: statDate,
-        ticket_id: ticketId,
-        ticket_type: ticketTypeByTicketId.get(ticketId) ?? null,
-        payment_id: paymentId,
-        mechanic_total_incl_vat: roundNumber(mechanicTotal),
-        ticket_total_incl_vat: roundNumber(ticketTotal),
-        line_count: lineCount,
-        updated_at: now,
-      });
+    } catch (paymentError) {
+      // Payment sync is non-critical for mechanic hour tracking – log but don't fail the sync
+      console.warn(`Payment sync step failed: ${paymentError instanceof Error ? paymentError.message : String(paymentError)}`);
     }
-
-    if (ticketRevenueUpserts.length > 0) {
-      const { error: revenueError } = await supabase.from("daily_ticket_revenue").upsert(ticketRevenueUpserts, {
-        onConflict: "stat_date,ticket_id",
-      });
-
-      if (revenueError) {
-        throw new Error(`Failed to upsert daily ticket revenue: ${revenueError.message}`);
-      }
-    }
-
-    await recalculateTotals(statDate);
 
     // Update CykelPlus customer count snapshot
     try {
@@ -764,7 +799,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       syncLogId,
       mode,
       statDate,
-      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls,
+      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls, // payment calls tracked separately
       materialsSeen: ticketMaterials.materialsSeen,
       mappedMaterialsSeen,
       rowsUpserted: upserts.length,

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServerConfig } from "@/lib/env";
 import { extractItemsFromUnknownPayload, normalizeTicketMaterial, type NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-material";
+import { extractItemsFromPaymentPayload, normalizePayment, type NormalizedPayment } from "@/lib/c1st/normalize-payment";
 
 type PaginationOptions = {
   paginationStart?: number;
@@ -286,6 +287,72 @@ export class CustomersFirstClient {
       paginationStart,
       paginationPageLength: pageLength,
     });
+  }
+
+  async listAllUpdatedPayments(updatedAfter: string): Promise<{ normalizedItems: NormalizedPayment[]; httpCalls: number }> {
+    const baseUrl = this.config.c1stApiBaseUrl.replace(/\/$/, "");
+    const pageLength = this.config.c1stDefaultPageLength;
+    const allItems: NormalizedPayment[] = [];
+    let paginationStart = 0;
+    let httpCalls = 0;
+    let safetyCounter = 0;
+
+    while (safetyCounter < 1000) {
+      safetyCounter += 1;
+
+      const params = new URLSearchParams();
+      params.set("updated_after", updatedAfter);
+      params.set("extra", "1"); // includes articles and taskids
+      params.set("paginationStart", String(paginationStart));
+      params.set("paginationPageLength", String(pageLength));
+
+      const url = new URL(`${baseUrl}/pospayments`);
+      url.search = params.toString();
+
+      let response: Response | null = null;
+      for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+        response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${this.config.c1stApiToken}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+        });
+
+        if (response.ok) {
+          break;
+        }
+
+        if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
+          throw new Error(`Customers 1st /pospayments request failed with ${response.status} ${response.statusText}`);
+        }
+
+        await sleep(readRetryDelayMs(response, attempt));
+      }
+
+      if (!response || !response.ok) {
+        throw new Error("Customers 1st /pospayments request failed without a valid response.");
+      }
+
+      httpCalls += 1;
+      const payload = (await response.json()) as unknown;
+      const rawItems = extractItemsFromPaymentPayload(payload);
+      const normalizedItems = rawItems.flatMap((item) => {
+        const n = normalizePayment(item);
+        return n ? [n] : [];
+      });
+
+      allItems.push(...normalizedItems);
+
+      const nextStart = inferNextStart(payload, paginationStart, pageLength, rawItems.length);
+      if (nextStart === null) {
+        break;
+      }
+
+      paginationStart = nextStart;
+    }
+
+    return { normalizedItems: allItems, httpCalls };
   }
 
   async getCykelPlusCustomerCount(tag: string): Promise<number> {
