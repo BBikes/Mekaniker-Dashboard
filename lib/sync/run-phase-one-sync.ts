@@ -688,6 +688,63 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       }
     }
 
+    // Compute per-ticket cash register totals from ALL materials (not just mechanic lines).
+    // Only saves rows for tickets that have been paid (at least one line has a paymentId).
+    const ticketRevenueUpserts: Array<{
+      stat_date: string;
+      ticket_id: number;
+      ticket_type: string | null;
+      payment_id: number | null;
+      mechanic_total_incl_vat: number;
+      ticket_total_incl_vat: number;
+      line_count: number;
+      updated_at: string;
+    }> = [];
+
+    for (const [ticketId, materials] of ticketMaterials.materialsByTicketId) {
+      // Determine if ticket has been paid
+      const paymentId = materials.find((m) => m.paymentId !== null)?.paymentId ?? null;
+      if (paymentId === null) {
+        continue; // Not yet through the register – skip
+      }
+
+      let mechanicTotal = 0;
+      let ticketTotal = 0;
+      let lineCount = 0;
+
+      for (const material of materials) {
+        const paid = material.amountPaid ?? 0;
+        ticketTotal += paid;
+        lineCount += 1;
+
+        const productNo = material.productNo?.trim() ?? null;
+        if (productNo && mappingByItemNo.has(productNo)) {
+          mechanicTotal += paid;
+        }
+      }
+
+      ticketRevenueUpserts.push({
+        stat_date: statDate,
+        ticket_id: ticketId,
+        ticket_type: ticketTypeByTicketId.get(ticketId) ?? null,
+        payment_id: paymentId,
+        mechanic_total_incl_vat: roundNumber(mechanicTotal),
+        ticket_total_incl_vat: roundNumber(ticketTotal),
+        line_count: lineCount,
+        updated_at: now,
+      });
+    }
+
+    if (ticketRevenueUpserts.length > 0) {
+      const { error: revenueError } = await supabase.from("daily_ticket_revenue").upsert(ticketRevenueUpserts, {
+        onConflict: "stat_date,ticket_id",
+      });
+
+      if (revenueError) {
+        throw new Error(`Failed to upsert daily ticket revenue: ${revenueError.message}`);
+      }
+    }
+
     await recalculateTotals(statDate);
 
     // Update CykelPlus customer count snapshot

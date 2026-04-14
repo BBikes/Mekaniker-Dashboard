@@ -553,42 +553,49 @@ async function getRevenueTotals(
 ): Promise<{ arbeidstid: number; repair: number }> {
   const supabase = createAdminClient();
 
-  // Arbeidstid = sum of all mechanic hours × hourly rate (from daily_mechanic_totals)
-  // repair = sum of source_amountpaid for repair-type tickets (only populated when payment registered)
-  const [hoursResult, repairResult] = await Promise.all([
+  // Query real cash register totals from paid tickets
+  const [revenueResult, hoursResult] = await Promise.all([
+    supabase
+      .from("daily_ticket_revenue")
+      .select("mechanic_total_incl_vat, ticket_total_incl_vat")
+      .gte("stat_date", fromDate)
+      .lte("stat_date", toDate),
+    // Fallback: hours × rate used when no paid tickets exist yet in the period
     supabase
       .from("daily_mechanic_totals")
       .select("hours_total")
       .gte("stat_date", fromDate)
       .lte("stat_date", toDate),
-    supabase
-      .from("daily_ticket_item_baselines")
-      .select("source_amountpaid")
-      .gte("stat_date", fromDate)
-      .lte("stat_date", toDate)
-      .eq("ticket_type", "repair")
-      .not("source_amountpaid", "is", null),
   ]);
 
+  if (revenueResult.error) {
+    throw new Error(`Failed to load ticket revenue: ${revenueResult.error.message}`);
+  }
+
   if (hoursResult.error) {
-    throw new Error(`Failed to load arbeidstid hours: ${hoursResult.error.message}`);
+    throw new Error(`Failed to load mechanic hours: ${hoursResult.error.message}`);
   }
 
-  if (repairResult.error) {
-    throw new Error(`Failed to load repair revenue: ${repairResult.error.message}`);
-  }
+  const rows = revenueResult.data ?? [];
 
+  const mechanicTotal = rows.reduce(
+    (sum, row) => sum + toNumber((row as { mechanic_total_incl_vat: unknown }).mechanic_total_incl_vat),
+    0,
+  );
+
+  const ticketTotal = rows.reduce(
+    (sum, row) => sum + toNumber((row as { ticket_total_incl_vat: unknown }).ticket_total_incl_vat),
+    0,
+  );
+
+  // Fall back to hours × rate if no paid tickets have been registered yet in the period
   const totalHours = (hoursResult.data ?? []).reduce(
     (sum, row) => sum + toNumber((row as { hours_total: unknown }).hours_total),
     0,
   );
+  const arbeidstid = mechanicTotal > 0 ? mechanicTotal : totalHours * hourlyRate;
 
-  const repair = (repairResult.data ?? []).reduce(
-    (sum, row) => sum + toNumber((row as { source_amountpaid: unknown }).source_amountpaid),
-    0,
-  );
-
-  return { arbeidstid: totalHours * hourlyRate, repair };
+  return { arbeidstid, repair: ticketTotal };
 }
 
 async function getLatestCykelPlusCount(): Promise<number> {
@@ -636,14 +643,14 @@ async function buildRevenueBoard(setting: DashboardViewSetting, today: string): 
     bars: [
       {
         key: "arbeidstid",
-        label: "Omsætning arbejdstid",
+        label: "Mekaniker tid (kassen)",
         value: revenueTotals.arbeidstid,
         targetValue: scaledArbeidstid,
         isCurrency: true,
       },
       {
         key: "repair",
-        label: "Omsætning reparationer",
+        label: "Total reparationspris (kassen)",
         value: revenueTotals.repair,
         targetValue: scaledRepair,
         isCurrency: true,
