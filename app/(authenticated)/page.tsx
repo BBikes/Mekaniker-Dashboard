@@ -46,7 +46,7 @@ function getStatusGroups() {
     },
     {
       title: "Scheduler",
-      summary: "Bruges af Supabase Cron til automatisk sync hvert 10. minut.",
+      summary: "Bruges af Supabase Cron til automatisk sync hvert 15. minut.",
       ready: env.schedulerReady,
       rows: [{ label: "CRON_SECRET", present: env.cronSecret }],
     },

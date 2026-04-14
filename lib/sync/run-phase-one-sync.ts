@@ -8,6 +8,7 @@ import { getDailyTargetHoursForDate } from "@/lib/targets";
 import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
+const SYNC_CURSOR_OVERLAP_MINUTES = 2;
 
 type MechanicMapping = {
   id: string;
@@ -28,6 +29,7 @@ type DailyBaselineRow = {
   source_amountpaid: number | null;
   source_updated_at: string | null;
   ticket_material_id: number;
+  ticket_type?: string | null;
   last_seen_at: string | null;
 };
 
@@ -92,6 +94,16 @@ function dateDaysAgo(daysAgo: number) {
 
 function atStartOfDay(date: string) {
   return `${date} 00:00:00`;
+}
+
+function rewindIsoTimestamp(timestamp: string, minutes: number) {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return timestamp;
+  }
+
+  parsed.setUTCMinutes(parsed.getUTCMinutes() - minutes);
+  return parsed.toISOString();
 }
 
 function resolveMaterialStatDate(material: NormalizedTicketMaterial, fallbackDate?: string | null) {
@@ -305,6 +317,7 @@ async function loadRowsForDate(statDate: string) {
       source_amountpaid,
       source_updated_at,
       ticket_material_id,
+      ticket_type,
       last_seen_at
     `)
     .eq("stat_date", statDate);
@@ -335,6 +348,7 @@ async function loadPreviousRowsByMaterialId(statDate: string, ticketMaterialIds:
       source_amountpaid,
       source_updated_at,
       ticket_material_id,
+      ticket_type,
       last_seen_at
     `)
     .lt("stat_date", statDate)
@@ -429,6 +443,35 @@ async function recalculateTotals(statDate: string) {
   }
 }
 
+async function loadLatestBaselineTicketTypes(ticketIds: number[]) {
+  if (ticketIds.length === 0) {
+    return new Map<number, string>();
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("daily_ticket_item_baselines")
+    .select("ticket_id, ticket_type, stat_date")
+    .in("ticket_id", ticketIds)
+    .order("stat_date", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load baseline ticket types: ${error.message}`);
+  }
+
+  const ticketTypes = new Map<number, string>();
+
+  for (const row of (data ?? []) as Array<{ ticket_id: number; ticket_type: string | null }>) {
+    if (!row.ticket_type || ticketTypes.has(row.ticket_id)) {
+      continue;
+    }
+
+    ticketTypes.set(row.ticket_id, row.ticket_type);
+  }
+
+  return ticketTypes;
+}
+
 async function getLastSuccessfulSyncTimestamp() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -444,7 +487,8 @@ async function getLastSuccessfulSyncTimestamp() {
     throw new Error(`Failed to load last successful sync timestamp: ${error.message}`);
   }
 
-  return (data?.finished_at as string | undefined) ?? atStartOfDay(getCopenhagenDateString());
+  const finishedAt = (data?.finished_at as string | undefined) ?? atStartOfDay(getCopenhagenDateString());
+  return rewindIsoTimestamp(finishedAt, SYNC_CURSOR_OVERLAP_MINUTES);
 }
 
 export async function probeCustomersFirstTicketMaterials() {
@@ -501,6 +545,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
         source_updated_at: row.source_updated_at,
         source_payment_id: row.source_payment_id,
         source_amountpaid: row.source_amountpaid,
+        ticket_type: row.ticket_type ?? null,
         last_seen_at: row.last_seen_at ?? now,
         anomaly_code: null,
         updated_at: now,
@@ -558,14 +603,29 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
     const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
     const client = new CustomersFirstClient();
-    const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
+    const updatedTicketsPromise = client.listAllUpdatedTickets(updatedAfter);
+    let updatedMaterialDiscovery: { normalizedItems: NormalizedTicketMaterial[]; httpCalls: number } = {
+      normalizedItems: [],
+      httpCalls: 0,
+    };
+
+    try {
+      updatedMaterialDiscovery = await client.listAllUpdatedTicketMaterials(updatedAfter);
+    } catch (error) {
+      console.warn(`Material delta sync fell back to ticket sync: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const updatedTickets = await updatedTicketsPromise;
     const ticketTypeByTicketId = new Map(
       updatedTickets.normalizedItems
         .filter((ticket) => ticket.ticketType !== null)
         .map((ticket) => [ticket.ticketId, ticket.ticketType as string]),
     );
-    const ticketMaterials = await fetchTicketScopedMaterials(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
-    const changedTicketIds = new Set(updatedTickets.normalizedItems.map((ticket) => ticket.ticketId));
+    const changedTicketIds = new Set([
+      ...updatedTickets.normalizedItems.map((ticket) => ticket.ticketId),
+      ...updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketId),
+    ]);
+    const ticketMaterials = await fetchTicketScopedMaterials([...changedTicketIds]);
     const allMaterials = [...ticketMaterials.materialsByTicketId.values()].flatMap((materials) => materials);
     const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
       statDate,
@@ -625,10 +685,10 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           current_quantity: roundNumber(currentQuantity),
           today_added_quantity: roundNumber(todayAddedQuantity),
           today_added_hours: roundNumber(todayAddedQuantity * 0.25),
-          source_updated_at: material.updatedAt,
+          source_updated_at: material.updatedAt ?? existingRow?.source_updated_at ?? null,
           source_payment_id: material.paymentId,
           source_amountpaid: material.amountPaid,
-          ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? null,
+          ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? existingRow?.ticket_type ?? null,
           line_total_incl_vat: material.totalInclVat ?? null,
           last_seen_at: now,
           anomaly_code: anomalyCode,
@@ -673,6 +733,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           source_updated_at: row.source_updated_at,
           source_payment_id: row.source_payment_id,
           source_amountpaid: row.source_amountpaid,
+          ticket_type: row.ticket_type ?? null,
           last_seen_at: now,
           anomaly_code: "missing_in_latest_fetch",
           updated_at: now,
@@ -716,6 +777,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
         // Load ticket type cache for ALL task IDs referenced by these payments
         const allTaskIds = [...new Set(updatedPayments.normalizedItems.flatMap((p) => p.taskIds))];
         const cachedTicketTypes = new Map<number, string>();
+        const baselineTicketTypes = await loadLatestBaselineTicketTypes(allTaskIds);
 
         if (allTaskIds.length > 0) {
           const { data: cachedRows } = await supabase
@@ -730,7 +792,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
           }
         }
 
-        const paymentUpserts = updatedPayments.normalizedItems.flatMap((payment) => {
+        const paymentUpserts = updatedPayments.normalizedItems.map((payment) => {
           // Payment date is required to bucket by correct day
           const paymentDate = payment.paymentDate ?? statDate;
 
@@ -752,19 +814,19 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
               // From this sync's ticket data
               ticketTypeByTicketId.get(id) === "repair" ||
               // Or from the persisted cache
-              cachedTicketTypes.get(id) === "repair",
+              cachedTicketTypes.get(id) === "repair" ||
+              // Or from the latest local baseline history
+              baselineTicketTypes.get(id) === "repair",
           );
 
-          return [
-            {
-              payment_id: payment.paymentId,
-              payment_date: paymentDate,
-              mechanic_total_incl_vat: roundNumber(mechanicTotal),
-              ticket_total_incl_vat: roundNumber(ticketTotal),
-              is_repair: isRepair,
-              updated_at: now,
-            },
-          ];
+          return {
+            payment_id: payment.paymentId,
+            payment_date: paymentDate,
+            mechanic_total_incl_vat: roundNumber(mechanicTotal),
+            ticket_total_incl_vat: roundNumber(ticketTotal),
+            is_repair: isRepair,
+            updated_at: now,
+          };
         });
 
         if (paymentUpserts.length > 0) {
@@ -799,7 +861,7 @@ export async function runPhaseOneSync(mode: SyncMode): Promise<SyncResult> {
       syncLogId,
       mode,
       statDate,
-      httpCalls: updatedTickets.httpCalls + ticketMaterials.httpCalls, // payment calls tracked separately
+      httpCalls: updatedTickets.httpCalls + updatedMaterialDiscovery.httpCalls + ticketMaterials.httpCalls,
       materialsSeen: ticketMaterials.materialsSeen,
       mappedMaterialsSeen,
       rowsUpserted: upserts.length,

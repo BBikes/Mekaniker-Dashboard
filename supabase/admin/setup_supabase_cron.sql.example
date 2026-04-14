@@ -20,7 +20,7 @@ select vault.create_secret(
 
 select cron.schedule(
   'bbikes-workshop-sync',
-  '*/10 * * * *',
+  '*/15 * * * *',
   $$
   select
     net.http_post(

@@ -26,6 +26,8 @@ Valgfrit:
 - `SUPABASE_URL`
 - `C1ST_API_BASE_URL`
 - `C1ST_DEFAULT_PAGE_LENGTH`
+- `C1ST_USE_UPDATED_AFTER`
+- `C1ST_UPDATED_AFTER_PARAM`
 - `C1ST_EXTRA_TICKET_MATERIAL_QUERY`
 
 Bemark:
@@ -68,8 +70,9 @@ Aabn:
 
 ## Noter
 
-- Automatisk 10-minutters sync korer via Supabase Cron og kalder `/api/cron/sync` med `CRON_SECRET`.
+- Automatisk 15-minutters sync korer via Supabase Cron og kalder `/api/cron/sync` med `CRON_SECRET`.
 - Scheduled route korer baseline plus normal sync uden historisk import.
 - Manuel sync er stadig tilgaengelig fra kontrolpanelet.
 - KPI beregnes kun ud fra de mekaniker-varenumre, der er oprettet under `/settings`.
+- Hvis Customers 1st understotter materiale-delta direkte, saet `C1ST_USE_UPDATED_AFTER=true` og juster evt. `C1ST_UPDATED_AFTER_PARAM`.
 - Hvis Customers 1st-kontrakten afviger fra antagelserne, juster normalizeren i `lib/c1st/normalize-ticket-material.ts`.

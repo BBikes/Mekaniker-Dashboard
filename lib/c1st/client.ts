@@ -15,6 +15,7 @@ type ListTicketsOptions = PaginationOptions & {
 
 type ListTicketMaterialsOptions = PaginationOptions & {
   ticketId?: number;
+  updatedAfter?: string;
 };
 
 export type NormalizedTicket = {
@@ -280,6 +281,10 @@ export class CustomersFirstClient {
       params.set("ticketid", String(options.ticketId));
     }
 
+    if (options.updatedAfter && this.config.c1stUseUpdatedAfter) {
+      params.set(this.config.c1stUpdatedAfterParam, options.updatedAfter);
+    }
+
     return this.requestPage({
       path: "/tickets/materials",
       params,
@@ -353,6 +358,49 @@ export class CustomersFirstClient {
     }
 
     return { normalizedItems: allItems, httpCalls };
+  }
+
+  async listAllUpdatedTicketMaterials(updatedAfter: string): Promise<{ normalizedItems: NormalizedTicketMaterial[]; httpCalls: number }> {
+    if (!this.config.c1stUseUpdatedAfter) {
+      return { normalizedItems: [], httpCalls: 0 };
+    }
+
+    const pages: TicketMaterialsPage[] = [];
+    const seenMaterialIds = new Set<number>();
+    let paginationStart = 0;
+    let safetyCounter = 0;
+
+    while (safetyCounter < 1000) {
+      safetyCounter += 1;
+      const page = await this.listTicketMaterialsPage({ updatedAfter, paginationStart });
+      pages.push(page);
+
+      if (page.nextStart === null) {
+        break;
+      }
+
+      paginationStart = page.nextStart;
+    }
+
+    if (safetyCounter >= 1000) {
+      throw new Error("Stopped Customers 1st material pagination after 1000 pages");
+    }
+
+    const normalizedItems = pages
+      .flatMap((page) => page.normalizedItems)
+      .filter((material) => {
+        if (seenMaterialIds.has(material.ticketMaterialId)) {
+          return false;
+        }
+
+        seenMaterialIds.add(material.ticketMaterialId);
+        return true;
+      });
+
+    return {
+      normalizedItems,
+      httpCalls: pages.length,
+    };
   }
 
   async getCykelPlusCustomerCount(tag: string): Promise<number> {
