@@ -110,6 +110,19 @@ export function InternalActions({
           {pendingLabel === "Opret dagens baseline" ? "Kører..." : "Opret dagens baseline"}
         </button>
         <button
+          className="button button--ghost"
+          disabled={buttonsDisabled}
+          onClick={() =>
+            run("Backfill betalinger (7 dage)", "/api/sync/manual", {
+              method: "POST",
+              body: JSON.stringify({ mode: "payments_backfill", days: 7 }),
+            })
+          }
+          type="button"
+        >
+          {pendingLabel === "Backfill betalinger (7 dage)" ? "Kører..." : "Backfill betalinger (7 dage)"}
+        </button>
+        <button
           className="button button--accent"
           disabled={buttonsDisabled}
           onClick={() =>
