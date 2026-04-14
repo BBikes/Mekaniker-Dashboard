@@ -391,18 +391,6 @@ select {
   z-index: 2;
 }
 
-.bar-target-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--target);
-  pointer-events: none;
-  z-index: 2;
-}
-
 .bar-fill {
   width: 100%;
   border-radius: 18px 18px 0 0;

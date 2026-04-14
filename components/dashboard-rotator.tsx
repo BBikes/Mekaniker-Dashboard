@@ -102,12 +102,7 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
           <article className="bar-card" key={row.id}>
             <div className="bar-track">
               {row.targetHours > 0 && (
-                <>
-                  <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
-                  <div className="bar-target-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 4px)` }}>
-                    Mål: {formatHours(row.targetHours)}
-                  </div>
-                </>
+                <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
               )}
               <div className="bar-fill" style={{ height: `${Math.max(fillRatio, row.hours > 0 ? 4 : 0)}%`, ...barStyle(pct) }}>
                 {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
@@ -138,12 +133,7 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
           <article className="focus-bar-card" key={metric.key}>
             <div className="focus-bar-track">
               {metric.targetHours > 0 && (
-                <>
-                  <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
-                  <div className="bar-target-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 4px)` }}>
-                    Mål: {formatHours(metric.targetHours)}
-                  </div>
-                </>
+                <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
               )}
               <div className="bar-fill" style={{ height: `${Math.max(fillRatio, metric.hours > 0 ? 4 : 0)}%`, ...barStyle(pct) }}>
                 {metric.quarters > 0 ? `${metric.quarters.toFixed(0)} kv` : ""}
@@ -182,12 +172,7 @@ function RevenueBars({ bars }: { bars: DashboardRevenueBar[] }) {
           <article className="bar-card" key={bar.key}>
             <div className="bar-track">
               {bar.targetValue > 0 && (
-                <>
-                  <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
-                  <div className="bar-target-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 4px)` }}>
-                    Mål: {bar.isCurrency ? formatCurrency(bar.targetValue) : bar.targetValue.toFixed(0)}
-                  </div>
-                </>
+                <div className="bar-target-line" style={{ bottom: `${TARGET_LINE_RATIO}%` }} />
               )}
               <div className="bar-fill" style={{ height: `${Math.max(fillRatio, bar.value > 0 ? 4 : 0)}%`, ...barStyle(pct) }}>
                 {bar.value > 0 && !bar.isCurrency ? bar.value.toFixed(0) : ""}
