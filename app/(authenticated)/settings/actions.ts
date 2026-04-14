@@ -341,6 +341,7 @@ export async function saveRevenueTargetsAction(formData: FormData) {
   const arbeidstid = readNumber(formData, "revenue_target_arbeidstid", 0);
   const repair = readNumber(formData, "revenue_target_repair", 0);
   const cykelplus = readNumber(formData, "revenue_target_cykelplus", 0);
+  const hourlyRate = readNumber(formData, "revenue_target_hourly_rate", 450);
 
   const now = new Date().toISOString();
   const supabase = createAdminClient();
@@ -350,6 +351,7 @@ export async function saveRevenueTargetsAction(formData: FormData) {
       { metric_key: "arbeidstid", daily_target: arbeidstid, updated_at: now },
       { metric_key: "repair", daily_target: repair, updated_at: now },
       { metric_key: "cykelplus", daily_target: cykelplus, updated_at: now },
+      { metric_key: "hourly_rate", daily_target: hourlyRate, updated_at: now },
     ],
     { onConflict: "metric_key" },
   );

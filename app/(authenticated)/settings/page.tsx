@@ -46,7 +46,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     active: boolean;
   }> = [];
   let dashboardViews: Awaited<ReturnType<typeof getDashboardViewSettings>> = [];
-  let revenueTargets: Record<string, number> = { arbeidstid: 0, repair: 0, cykelplus: 0 };
+  let revenueTargets: Record<string, number> = { arbeidstid: 0, repair: 0, cykelplus: 0, hourly_rate: 450 };
   let loadError: string | null = null;
 
   try {
@@ -313,6 +313,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
                   id="revenue-target-cykelplus"
                   min="0"
                   name="revenue_target_cykelplus"
+                  step="1"
+                  type="number"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="revenue-target-hourly-rate">Timepris (kr/time)</label>
+                <input
+                  defaultValue={revenueTargets.hourly_rate}
+                  id="revenue-target-hourly-rate"
+                  min="0"
+                  name="revenue_target_hourly_rate"
                   step="1"
                   type="number"
                 />

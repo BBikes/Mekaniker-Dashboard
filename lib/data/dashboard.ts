@@ -546,16 +546,21 @@ async function getRevenueKpiTargets(): Promise<Map<string, number>> {
   return map;
 }
 
-async function getRevenueTotals(fromDate: string, toDate: string): Promise<{ arbeidstid: number; repair: number }> {
+async function getRevenueTotals(
+  fromDate: string,
+  toDate: string,
+  hourlyRate: number,
+): Promise<{ arbeidstid: number; repair: number }> {
   const supabase = createAdminClient();
 
-  const [arbeidstidResult, repairResult] = await Promise.all([
+  // Arbeidstid = sum of all mechanic hours × hourly rate (from daily_mechanic_totals)
+  // repair = sum of source_amountpaid for repair-type tickets (only populated when payment registered)
+  const [hoursResult, repairResult] = await Promise.all([
     supabase
-      .from("daily_ticket_item_baselines")
-      .select("line_total_incl_vat")
+      .from("daily_mechanic_totals")
+      .select("hours_total")
       .gte("stat_date", fromDate)
-      .lte("stat_date", toDate)
-      .not("mechanic_id", "is", null),
+      .lte("stat_date", toDate),
     supabase
       .from("daily_ticket_item_baselines")
       .select("source_amountpaid")
@@ -565,16 +570,16 @@ async function getRevenueTotals(fromDate: string, toDate: string): Promise<{ arb
       .not("source_amountpaid", "is", null),
   ]);
 
-  if (arbeidstidResult.error) {
-    throw new Error(`Failed to load arbeidstid revenue: ${arbeidstidResult.error.message}`);
+  if (hoursResult.error) {
+    throw new Error(`Failed to load arbeidstid hours: ${hoursResult.error.message}`);
   }
 
   if (repairResult.error) {
     throw new Error(`Failed to load repair revenue: ${repairResult.error.message}`);
   }
 
-  const arbeidstid = (arbeidstidResult.data ?? []).reduce(
-    (sum, row) => sum + toNumber((row as { line_total_incl_vat: unknown }).line_total_incl_vat),
+  const totalHours = (hoursResult.data ?? []).reduce(
+    (sum, row) => sum + toNumber((row as { hours_total: unknown }).hours_total),
     0,
   );
 
@@ -583,7 +588,7 @@ async function getRevenueTotals(fromDate: string, toDate: string): Promise<{ arb
     0,
   );
 
-  return { arbeidstid, repair };
+  return { arbeidstid: totalHours * hourlyRate, repair };
 }
 
 async function getLatestCykelPlusCount(): Promise<number> {
@@ -604,11 +609,13 @@ async function getLatestCykelPlusCount(): Promise<number> {
 
 async function buildRevenueBoard(setting: DashboardViewSetting, today: string): Promise<DashboardRevenueBoard> {
   const window = getDashboardWindow(setting.boardType, today);
-  const [revenueTotals, cykelPlusCount, kpiTargets] = await Promise.all([
-    getRevenueTotals(window.fromDate, window.toDate),
+  const [cykelPlusCount, kpiTargets] = await Promise.all([
     getLatestCykelPlusCount(),
     getRevenueKpiTargets(),
   ]);
+
+  const hourlyRate = kpiTargets.get("hourly_rate") ?? 450;
+  const revenueTotals = await getRevenueTotals(window.fromDate, window.toDate, hourlyRate);
 
   const periodWorkdays = countWeekdaysBetween(window.fromDate, window.toDate);
 
