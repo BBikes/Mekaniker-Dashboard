@@ -108,7 +108,7 @@ function PeriodBars({ rows }: { rows: DashboardBarRow[] }) {
                 {row.quarters > 0 ? `${row.quarters.toFixed(0)} kv` : ""}
               </div>
               {row.hours > 0 && (
-                <div className="bar-value-overlay" style={{ bottom: `calc(${Math.max(fillRatio, row.hours > 0 ? 4 : 0)}% + 10px)` }}>
+                <div className="bar-value-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
                   {formatHours(row.hours)}
                 </div>
               )}
@@ -139,7 +139,7 @@ function FocusMetricBars({ metrics }: { metrics: DashboardFocusMetric[] }) {
                 {metric.quarters > 0 ? `${metric.quarters.toFixed(0)} kv` : ""}
               </div>
               {metric.hours > 0 && (
-                <div className="focus-bar-value" style={{ bottom: `calc(${Math.max(fillRatio, metric.hours > 0 ? 4 : 0)}% + 10px)` }}>
+                <div className="focus-bar-value" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
                   {formatHours(metric.hours)}
                 </div>
               )}
@@ -178,7 +178,7 @@ function RevenueBars({ bars }: { bars: DashboardRevenueBar[] }) {
                 {bar.value > 0 && !bar.isCurrency ? bar.value.toFixed(0) : ""}
               </div>
               {bar.value > 0 && (
-                <div className="bar-value-overlay" style={{ bottom: `calc(${Math.max(fillRatio, bar.value > 0 ? 4 : 0)}% + 10px)` }}>
+                <div className="bar-value-overlay" style={{ bottom: `calc(${TARGET_LINE_RATIO}% + 10px)` }}>
                   {bar.isCurrency ? formatCurrency(bar.value) : bar.value.toFixed(0)}
                 </div>
               )}
