@@ -1,0 +1,2911 @@
+{
+  "backedUpAt": "2026-04-16T17:08:53.510Z",
+  "gitHead": "be19d8c32ddd0cb8aad54fc09d79e774f640e218",
+  "tables": {
+    "dashboard_view_settings": {
+      "ok": true,
+      "rows": [
+        {
+          "board_type": "current_month",
+          "board_title": "Aktuel måned",
+          "display_order": 6,
+          "duration_seconds": 30,
+          "active": true,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "current_week",
+          "board_title": "Aktuel uge",
+          "display_order": 5,
+          "duration_seconds": 30,
+          "active": true,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "last_month",
+          "board_title": "Seneste måned",
+          "display_order": 8,
+          "duration_seconds": 10,
+          "active": false,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "last_week",
+          "board_title": "Seneste uge",
+          "display_order": 7,
+          "duration_seconds": 10,
+          "active": false,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "mechanic_focus",
+          "board_title": "Mekaniker-fokus",
+          "display_order": 9,
+          "duration_seconds": 20,
+          "active": false,
+          "selected_mechanic_ids": [
+            "754f6116-6245-4ef5-a255-8bcb8ecd9ecc",
+            "d6e1dd07-1d53-4548-b024-5e9544dcb7ff",
+            "11bdec3a-220a-4562-9364-e2cb1c9e48eb",
+            "fe82e04b-8484-463a-9ae9-1dabc0c0639c",
+            "9162b45b-0315-48b4-b9a7-dc787c6f9d34"
+          ],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": [
+            "today",
+            "current_week",
+            "current_month"
+          ]
+        },
+        {
+          "board_type": "revenue_current_month",
+          "board_title": "Omsætning aktuel måned",
+          "display_order": 3,
+          "duration_seconds": 10,
+          "active": false,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-14T17:21:12.740095+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "revenue_current_week",
+          "board_title": "Omsætning aktuel uge",
+          "display_order": 2,
+          "duration_seconds": 300,
+          "active": true,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-14T17:21:12.740095+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "revenue_today",
+          "board_title": "Omsætning i dag",
+          "display_order": 1,
+          "duration_seconds": 10,
+          "active": false,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-14T17:21:12.740095+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        },
+        {
+          "board_type": "today",
+          "board_title": "I dag",
+          "display_order": 4,
+          "duration_seconds": 60,
+          "active": false,
+          "selected_mechanic_ids": [],
+          "created_at": "2026-04-09T20:02:29.553606+00:00",
+          "updated_at": "2026-04-15T09:31:09.133+00:00",
+          "selected_focus_metric_keys": []
+        }
+      ]
+    },
+    "revenue_kpi_targets": {
+      "ok": true,
+      "rows": [
+        {
+          "metric_key": "arbeidstid",
+          "daily_target": 15000,
+          "updated_at": "2026-04-15T09:09:03.919+00:00"
+        },
+        {
+          "metric_key": "cykelplus",
+          "daily_target": 50,
+          "updated_at": "2026-04-15T09:09:03.919+00:00"
+        },
+        {
+          "metric_key": "hourly_rate",
+          "daily_target": 740,
+          "updated_at": "2026-04-15T09:09:03.919+00:00"
+        },
+        {
+          "metric_key": "repair",
+          "daily_target": 30000,
+          "updated_at": "2026-04-15T09:09:03.919+00:00"
+        }
+      ]
+    },
+    "cykelplus_snapshots": {
+      "ok": true,
+      "rows": [
+        {
+          "snapshot_date": "2026-04-14",
+          "customer_count": 11,
+          "created_at": "2026-04-14T17:30:07.189623+00:00",
+          "updated_at": "2026-04-14T21:50:05.109+00:00"
+        },
+        {
+          "snapshot_date": "2026-04-15",
+          "customer_count": 11,
+          "created_at": "2026-04-14T22:00:09.876051+00:00",
+          "updated_at": "2026-04-15T21:50:05.63+00:00"
+        },
+        {
+          "snapshot_date": "2026-04-16",
+          "customer_count": 11,
+          "created_at": "2026-04-15T22:00:07.719436+00:00",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        }
+      ]
+    },
+    "daily_ticket_revenue": {
+      "ok": true,
+      "rows": []
+    },
+    "daily_payment_summary": {
+      "ok": true,
+      "rows": [
+        {
+          "payment_id": 30338907,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30376761,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30378450,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 2220,
+          "ticket_total_incl_vat": 5053,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30378514,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 938,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30379296,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 740,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30379316,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 740,
+          "ticket_total_incl_vat": 7437,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30385838,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30386362,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 4028,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30393217,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 1730.65,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30393319,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30393478,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 448,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30393967,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 32.8,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30396440,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 655.5,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30396866,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 37916,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30398027,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 577,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30399858,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30400028,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30400324,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 299,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30403240,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30403818,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 925,
+          "ticket_total_incl_vat": 1938.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30404869,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 899,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30407203,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 740,
+          "ticket_total_incl_vat": 3154,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30408309,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 1713.5,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30408338,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 740,
+          "ticket_total_incl_vat": 3431.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30412651,
+          "payment_date": "2026-04-08",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 1237,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30421298,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 2473.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30422683,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30425724,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 761,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30440880,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 699,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441009,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 699,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441127,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 1480,
+          "ticket_total_incl_vat": 3248.07,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441145,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441235,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 1331.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441430,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441503,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 1331.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441829,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 1331.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30441858,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30442026,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 1678.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30442057,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2048,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30442135,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 5735,
+          "ticket_total_incl_vat": 11113,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30442181,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30442441,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 606.5,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30443583,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 740,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30446748,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 459,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30446766,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 4041.8,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450224,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 3142.46,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450225,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1876,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450227,
+          "payment_date": "2026-04-09",
+          "mechanic_total_incl_vat": 1665,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450486,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 198,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450871,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 3889,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450875,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 740,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450993,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 1082.24,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30450996,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 1665,
+          "ticket_total_incl_vat": 3578.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30452655,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 578.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30452663,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": -578.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30452667,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 2164.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30454507,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": -16199.1,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30454517,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 16199.1,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30454536,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30455998,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 606.5,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456074,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 1729.46,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456163,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1056,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456458,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456461,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456483,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456501,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2997,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456596,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 149,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30456649,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30457327,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 58995,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30457356,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 14925,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30459191,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 3700,
+          "ticket_total_incl_vat": 14070.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30460143,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30460191,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 2428.46,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30460217,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 2423.57,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30460290,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30461902,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 15,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30462423,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2078.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30463684,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 1162.15,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30466455,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 5999,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30466486,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30466523,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 4079,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30469600,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 299,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30470140,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 299,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30498430,
+          "payment_date": "2026-04-10",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30500012,
+          "payment_date": "2026-04-11",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 8587,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30503231,
+          "payment_date": "2026-04-11",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 828,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30503428,
+          "payment_date": "2026-04-11",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 18651.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30507589,
+          "payment_date": "2026-04-11",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 2091,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30512983,
+          "payment_date": "2026-04-11",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 10000,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30533073,
+          "payment_date": "2026-04-12",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30533075,
+          "payment_date": "2026-04-12",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30533080,
+          "payment_date": "2026-04-12",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30534052,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 15747,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30534141,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 688,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30534838,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 384,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30535806,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 1480,
+          "ticket_total_incl_vat": 3771.15,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30536790,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 925,
+          "ticket_total_incl_vat": 2422.6,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30540554,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 8687,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30541132,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 1295,
+          "ticket_total_incl_vat": 1600.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30542009,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2997,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30542015,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2897,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30544664,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30548035,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 10,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30548284,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 948.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30549472,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 418.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30549656,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 418.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30549676,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 49.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30549795,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 89.95,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30550219,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 3799,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30552627,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 2283.85,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30554440,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 699,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30555385,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1406,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30555461,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 957.6,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30555540,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 555,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30558778,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 4373.75,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30558780,
+          "payment_date": "2026-04-13",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 3514.7,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30560648,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 811,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30561130,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 534.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30563641,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 534.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30564423,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 933.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30567349,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30568339,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 549,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30568353,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 26738,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30570174,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1398,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571830,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571832,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571837,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571844,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571857,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571924,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571928,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571941,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571947,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571951,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571953,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571958,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571964,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30571966,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30572019,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30576054,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 40.89,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30576128,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 2035,
+          "ticket_total_incl_vat": 42951,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30577350,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 1665,
+          "ticket_total_incl_vat": 4982,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30577802,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 1480,
+          "ticket_total_incl_vat": 2668.9,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30579155,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30580092,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 11994,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30580132,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 2525.95,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30581103,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 576,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30581189,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 2070.61,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30581368,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 5524.75,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582009,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": -11994,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582087,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 5524.75,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582099,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582273,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "payment_id": 30582945,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 2086,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582971,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 4373.75,
+          "is_repair": true,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30582972,
+          "payment_date": "2026-04-14",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 14998,
+          "is_repair": false,
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "payment_id": 30585322,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 969.95,
+          "is_repair": true,
+          "updated_at": "2026-04-15T07:50:04.016+00:00"
+        },
+        {
+          "payment_id": 30585575,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 429,
+          "is_repair": true,
+          "updated_at": "2026-04-15T08:00:04.504+00:00"
+        },
+        {
+          "payment_id": 30585721,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 199.95,
+          "is_repair": true,
+          "updated_at": "2026-04-15T08:10:02.592+00:00"
+        },
+        {
+          "payment_id": 30586212,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 37342,
+          "is_repair": false,
+          "updated_at": "2026-04-15T15:10:02.665+00:00"
+        },
+        {
+          "payment_id": 30586265,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1949,
+          "is_repair": false,
+          "updated_at": "2026-04-15T08:40:02.95+00:00"
+        },
+        {
+          "payment_id": 30587364,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 623,
+          "is_repair": true,
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "payment_id": 30588537,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 568,
+          "is_repair": true,
+          "updated_at": "2026-04-15T09:03:55.858+00:00"
+        },
+        {
+          "payment_id": 30595115,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 13074,
+          "is_repair": false,
+          "updated_at": "2026-04-15T11:20:02.602+00:00"
+        },
+        {
+          "payment_id": 30595128,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 13074,
+          "is_repair": false,
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "payment_id": 30595296,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1099,
+          "is_repair": true,
+          "updated_at": "2026-04-15T11:40:02.802+00:00"
+        },
+        {
+          "payment_id": 30602360,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 1560,
+          "is_repair": true,
+          "updated_at": "2026-04-15T13:50:02.978+00:00"
+        },
+        {
+          "payment_id": 30602385,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 740,
+          "is_repair": true,
+          "updated_at": "2026-04-15T14:40:03.746+00:00"
+        },
+        {
+          "payment_id": 30604072,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": -900,
+          "is_repair": false,
+          "updated_at": "2026-04-15T14:10:02.621+00:00"
+        },
+        {
+          "payment_id": 30605832,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 1617.2,
+          "is_repair": true,
+          "updated_at": "2026-04-15T14:40:03.746+00:00"
+        },
+        {
+          "payment_id": 30605873,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 3514,
+          "is_repair": false,
+          "updated_at": "2026-04-15T14:50:02.949+00:00"
+        },
+        {
+          "payment_id": 30607175,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 5244,
+          "is_repair": false,
+          "updated_at": "2026-04-15T15:10:02.665+00:00"
+        },
+        {
+          "payment_id": 30608575,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 1997,
+          "is_repair": true,
+          "updated_at": "2026-04-15T15:30:02.815+00:00"
+        },
+        {
+          "payment_id": 30609491,
+          "payment_date": "2026-04-15",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 449,
+          "is_repair": false,
+          "updated_at": "2026-04-15T16:10:03.566+00:00"
+        },
+        {
+          "payment_id": 30610656,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 740,
+          "is_repair": true,
+          "updated_at": "2026-04-16T06:10:04.46+00:00"
+        },
+        {
+          "payment_id": 30610657,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 740,
+          "ticket_total_incl_vat": 499,
+          "is_repair": true,
+          "updated_at": "2026-04-16T07:50:03.282+00:00"
+        },
+        {
+          "payment_id": 30611558,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 2719,
+          "is_repair": true,
+          "updated_at": "2026-04-16T07:30:03.416+00:00"
+        },
+        {
+          "payment_id": 30612091,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 912.75,
+          "is_repair": true,
+          "updated_at": "2026-04-16T09:40:02.681+00:00"
+        },
+        {
+          "payment_id": 30612853,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 946,
+          "is_repair": true,
+          "updated_at": "2026-04-16T08:20:02.626+00:00"
+        },
+        {
+          "payment_id": 30612898,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-16T15:30:05.268+00:00"
+        },
+        {
+          "payment_id": 30617824,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 2696,
+          "is_repair": true,
+          "updated_at": "2026-04-16T10:00:02.771+00:00"
+        },
+        {
+          "payment_id": 30620669,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": -740,
+          "is_repair": true,
+          "updated_at": "2026-04-16T11:00:04.091+00:00"
+        },
+        {
+          "payment_id": 30620682,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-16T11:10:03.51+00:00"
+        },
+        {
+          "payment_id": 30621238,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 9493,
+          "is_repair": false,
+          "updated_at": "2026-04-16T11:10:03.51+00:00"
+        },
+        {
+          "payment_id": 30621259,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 8999,
+          "is_repair": false,
+          "updated_at": "2026-04-16T15:00:03.219+00:00"
+        },
+        {
+          "payment_id": 30622481,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 199.95,
+          "is_repair": false,
+          "updated_at": "2026-04-16T11:40:02.862+00:00"
+        },
+        {
+          "payment_id": 30623668,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 59,
+          "is_repair": false,
+          "updated_at": "2026-04-16T12:00:03.277+00:00"
+        },
+        {
+          "payment_id": 30623694,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 740,
+          "ticket_total_incl_vat": 939,
+          "is_repair": true,
+          "updated_at": "2026-04-16T12:30:02.746+00:00"
+        },
+        {
+          "payment_id": 30623717,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 370,
+          "ticket_total_incl_vat": 2246.95,
+          "is_repair": true,
+          "updated_at": "2026-04-16T12:00:03.277+00:00"
+        },
+        {
+          "payment_id": 30625016,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 1110,
+          "ticket_total_incl_vat": 3643.8,
+          "is_repair": true,
+          "updated_at": "2026-04-16T13:40:02.775+00:00"
+        },
+        {
+          "payment_id": 30627956,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 555,
+          "ticket_total_incl_vat": 1969,
+          "is_repair": true,
+          "updated_at": "2026-04-16T13:20:02.615+00:00"
+        },
+        {
+          "payment_id": 30628765,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 299,
+          "is_repair": true,
+          "updated_at": "2026-04-16T14:20:04.817+00:00"
+        },
+        {
+          "payment_id": 30631293,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 5598.95,
+          "is_repair": false,
+          "updated_at": "2026-04-16T14:50:02.912+00:00"
+        },
+        {
+          "payment_id": 30635548,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 460.15,
+          "is_repair": true,
+          "updated_at": "2026-04-16T15:40:08.375+00:00"
+        },
+        {
+          "payment_id": 30635598,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 391,
+          "is_repair": true,
+          "updated_at": "2026-04-16T15:40:08.375+00:00"
+        },
+        {
+          "payment_id": 30635638,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 185,
+          "ticket_total_incl_vat": 391,
+          "is_repair": true,
+          "updated_at": "2026-04-16T15:40:08.375+00:00"
+        },
+        {
+          "payment_id": 30635650,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 0,
+          "ticket_total_incl_vat": 0,
+          "is_repair": true,
+          "updated_at": "2026-04-16T15:40:08.375+00:00"
+        },
+        {
+          "payment_id": 30636289,
+          "payment_date": "2026-04-16",
+          "mechanic_total_incl_vat": 3700,
+          "ticket_total_incl_vat": 9197.75,
+          "is_repair": true,
+          "updated_at": "2026-04-16T16:00:06.285+00:00"
+        }
+      ]
+    },
+    "ticket_type_cache": {
+      "ok": true,
+      "rows": [
+        {
+          "ticket_id": 8301783,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T15:30:02.815+00:00"
+        },
+        {
+          "ticket_id": 8344171,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8344184,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8349494,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8354220,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8354545,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8374971,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8375039,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8375045,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8386627,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8395865,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8408718,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8413046,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8413057,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8415231,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8439787,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8439921,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8439933,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8439946,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8439972,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440032,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440104,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440385,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440401,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8440460,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440668,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440672,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440676,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440677,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440686,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440690,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440723,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440849,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8440910,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8441102,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8441164,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8441838,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8442380,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8452462,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8478994,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8513253,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8519029,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8523329,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T15:30:02.815+00:00"
+        },
+        {
+          "ticket_id": 8525559,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8525561,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8528528,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8533258,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8534471,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8534937,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T12:20:02.997+00:00"
+        },
+        {
+          "ticket_id": 8539016,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8539057,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8539107,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8539843,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8546786,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8549072,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T17:30:06.031+00:00"
+        },
+        {
+          "ticket_id": 8550348,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8550526,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8551153,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T09:50:03.16+00:00"
+        },
+        {
+          "ticket_id": 8563712,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8568177,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:20:06.023+00:00"
+        },
+        {
+          "ticket_id": 8568355,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T09:40:02.681+00:00"
+        },
+        {
+          "ticket_id": 8570605,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8572625,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8573533,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8578837,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8580580,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8583479,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8585376,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8586741,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8587080,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8595239,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8595281,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8603413,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8608050,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8608307,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8608716,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8609076,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8609298,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T13:10:02.959+00:00"
+        },
+        {
+          "ticket_id": 8610730,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8610992,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8611853,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:10:03.51+00:00"
+        },
+        {
+          "ticket_id": 8612223,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8612262,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8612273,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T13:00:03.585+00:00"
+        },
+        {
+          "ticket_id": 8612321,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T07:10:05.162+00:00"
+        },
+        {
+          "ticket_id": 8612347,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T12:10:03.244+00:00"
+        },
+        {
+          "ticket_id": 8612353,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8612363,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8612371,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T13:00:03.585+00:00"
+        },
+        {
+          "ticket_id": 8615222,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8615461,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8620096,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8620570,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8623391,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8627026,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8629510,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8632361,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8633546,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8634145,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8638123,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8638454,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8641043,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8646594,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8646666,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8647687,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8648372,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8648651,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T14:00:02.617+00:00"
+        },
+        {
+          "ticket_id": 8653382,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "ticket_id": 8653485,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T15:30:02.815+00:00"
+        },
+        {
+          "ticket_id": 8653524,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8653607,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8653901,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T09:40:02.681+00:00"
+        },
+        {
+          "ticket_id": 8653985,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8654602,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8655397,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8656264,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8656443,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8656722,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T10:40:02.733+00:00"
+        },
+        {
+          "ticket_id": 8656783,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8656884,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8657354,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8657457,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8657696,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8657717,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8657816,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8658538,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T16:20:06.023+00:00"
+        },
+        {
+          "ticket_id": 8658636,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T09:00:02.603+00:00"
+        },
+        {
+          "ticket_id": 8659111,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T13:40:02.775+00:00"
+        },
+        {
+          "ticket_id": 8659562,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8659769,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8660400,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T12:10:03.244+00:00"
+        },
+        {
+          "ticket_id": 8660686,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T09:03:55.858+00:00"
+        },
+        {
+          "ticket_id": 8660763,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8661211,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:10:03.5+00:00"
+        },
+        {
+          "ticket_id": 8661487,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8663255,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8663877,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T08:00:04.504+00:00"
+        },
+        {
+          "ticket_id": 8663983,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8664569,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8666011,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8666111,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8666588,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T12:10:03.244+00:00"
+        },
+        {
+          "ticket_id": 8668152,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8670981,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:20:02.957+00:00"
+        },
+        {
+          "ticket_id": 8671041,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8671120,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8671331,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8671755,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8671790,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T07:50:04.016+00:00"
+        },
+        {
+          "ticket_id": 8672418,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8673035,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8673061,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8673128,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8673239,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:00:02.94+00:00"
+        },
+        {
+          "ticket_id": 8673298,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T15:10:03.787+00:00"
+        },
+        {
+          "ticket_id": 8673897,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8674330,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T13:50:09.758+00:00"
+        },
+        {
+          "ticket_id": 8674589,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8675501,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8675878,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T07:40:02.782+00:00"
+        },
+        {
+          "ticket_id": 8676249,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8677009,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T06:10:04.46+00:00"
+        },
+        {
+          "ticket_id": 8677134,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8677154,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T13:00:03.585+00:00"
+        },
+        {
+          "ticket_id": 8677202,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T12:10:03.244+00:00"
+        },
+        {
+          "ticket_id": 8678072,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8678444,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8678908,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8680213,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8680395,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T16:10:03.566+00:00"
+        },
+        {
+          "ticket_id": 8680571,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8680903,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8682724,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8683379,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T08:10:02.592+00:00"
+        },
+        {
+          "ticket_id": 8685458,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T15:10:03.787+00:00"
+        },
+        {
+          "ticket_id": 8685869,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T13:10:02.959+00:00"
+        },
+        {
+          "ticket_id": 8685920,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T14:40:03.746+00:00"
+        },
+        {
+          "ticket_id": 8686384,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T14:40:03.746+00:00"
+        },
+        {
+          "ticket_id": 8686676,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T09:40:02.681+00:00"
+        },
+        {
+          "ticket_id": 8688516,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8689142,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T15:10:03.787+00:00"
+        },
+        {
+          "ticket_id": 8689805,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8692729,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T13:50:02.978+00:00"
+        },
+        {
+          "ticket_id": 8692999,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "ticket_id": 8693670,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8693711,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8693814,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T07:50:03.282+00:00"
+        },
+        {
+          "ticket_id": 8693990,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "ticket_id": 8694762,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:50:02.583+00:00"
+        },
+        {
+          "ticket_id": 8694834,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:30:02.82+00:00"
+        },
+        {
+          "ticket_id": 8696769,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8696774,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8697902,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8697915,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8698042,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-14T20:36:43.696+00:00"
+        },
+        {
+          "ticket_id": 8698636,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T15:40:08.375+00:00"
+        },
+        {
+          "ticket_id": 8700558,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T12:30:02.746+00:00"
+        },
+        {
+          "ticket_id": 8700822,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T10:40:02.733+00:00"
+        },
+        {
+          "ticket_id": 8701703,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T11:30:04.107+00:00"
+        },
+        {
+          "ticket_id": 8702102,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T08:40:03.06+00:00"
+        },
+        {
+          "ticket_id": 8702728,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T15:30:05.268+00:00"
+        },
+        {
+          "ticket_id": 8704902,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T08:40:02.95+00:00"
+        },
+        {
+          "ticket_id": 8705408,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8705503,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T09:30:02.762+00:00"
+        },
+        {
+          "ticket_id": 8706128,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8706188,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8706344,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T10:30:04.351+00:00"
+        },
+        {
+          "ticket_id": 8706367,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T11:40:02.802+00:00"
+        },
+        {
+          "ticket_id": 8706448,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T10:40:03.326+00:00"
+        },
+        {
+          "ticket_id": 8707369,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T14:20:04.817+00:00"
+        },
+        {
+          "ticket_id": 8707455,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T06:20:04.168+00:00"
+        },
+        {
+          "ticket_id": 8707500,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T15:10:02.665+00:00"
+        },
+        {
+          "ticket_id": 8707519,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-15T19:20:04.42+00:00"
+        },
+        {
+          "ticket_id": 8707851,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8709270,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:30:04.574+00:00"
+        },
+        {
+          "ticket_id": 8709523,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-15T14:50:02.949+00:00"
+        },
+        {
+          "ticket_id": 8709659,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:20:02.957+00:00"
+        },
+        {
+          "ticket_id": 8710623,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:00:04.091+00:00"
+        },
+        {
+          "ticket_id": 8711263,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T09:10:03.843+00:00"
+        },
+        {
+          "ticket_id": 8711544,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T08:20:02.626+00:00"
+        },
+        {
+          "ticket_id": 8711830,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T17:00:06.709+00:00"
+        },
+        {
+          "ticket_id": 8713263,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T13:30:04.079+00:00"
+        },
+        {
+          "ticket_id": 8713430,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T11:10:03.51+00:00"
+        },
+        {
+          "ticket_id": 8713960,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T11:50:02.79+00:00"
+        },
+        {
+          "ticket_id": 8715930,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T16:50:04.693+00:00"
+        },
+        {
+          "ticket_id": 8716077,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T14:50:02.912+00:00"
+        },
+        {
+          "ticket_id": 8716146,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T16:40:05.079+00:00"
+        },
+        {
+          "ticket_id": 8716165,
+          "ticket_type": "sale",
+          "updated_at": "2026-04-16T15:00:03.219+00:00"
+        },
+        {
+          "ticket_id": 8716250,
+          "ticket_type": "repair",
+          "updated_at": "2026-04-16T15:00:03.219+00:00"
+        }
+      ]
+    }
+  }
+}

@@ -27,6 +27,7 @@ type DailyBaselineRow = {
   mechanic_id: string;
   baseline_quantity: number;
   current_quantity: number;
+  today_added_quantity?: number | null;
   source_payment_id: number | null;
   source_amountpaid: number | null;
   source_updated_at: string | null;
@@ -331,6 +332,7 @@ async function loadRowsForDate(statDate: string) {
       mechanic_id,
       baseline_quantity,
       current_quantity,
+      today_added_quantity,
       source_payment_id,
       source_amountpaid,
       source_updated_at,
@@ -897,7 +899,14 @@ export async function runPhaseOneSync(
         mappedMaterialsSeen += 1;
         seenMaterialIds.add(material.ticketMaterialId);
         affectedMechanicIds.add(mapping.id);
-        const existingRow = existingRowsByMaterialId.get(material.ticketMaterialId) ?? previousRowsByMaterialId.get(material.ticketMaterialId);
+        const todayRow = existingRowsByMaterialId.get(material.ticketMaterialId);
+        const prevRow = previousRowsByMaterialId.get(material.ticketMaterialId);
+        // Only inherit baseline from a row if it belongs to the same mechanic mapping.
+        // If the varenummer on this ticket_material_id was changed from another mechanic's varenummer
+        // (e.g. a generic time code replaced by the mechanic's own varenummer), treat it as a fresh
+        // line so the full amount counts as today_added instead of 0.
+        const existingRow = (todayRow?.mechanic_id === mapping.id ? todayRow : undefined)
+          ?? (prevRow?.mechanic_id === mapping.id ? prevRow : undefined);
         const anomalyCode = buildBaselineAnomaly(existingRow, material, "sync");
 
         if (anomalyCode !== null) {
@@ -907,10 +916,10 @@ export async function runPhaseOneSync(
           }
         }
 
-        const baselineQuantity = existingRowsByMaterialId.has(material.ticketMaterialId)
-          ? Number(existingRowsByMaterialId.get(material.ticketMaterialId)!.baseline_quantity)
-          : existingRow
-            ? Number(existingRow.current_quantity)
+        const baselineQuantity = (todayRow?.mechanic_id === mapping.id)
+          ? Number(todayRow.baseline_quantity)
+          : (prevRow?.mechanic_id === mapping.id)
+            ? Number(prevRow.current_quantity)
             : 0;
         const currentQuantity = material.amount;
         const todayAddedQuantity = currentQuantity - baselineQuantity;
@@ -957,9 +966,22 @@ export async function runPhaseOneSync(
         anomalyCount += invisibleRows.length;
         rowsCorrected += invisibleRows.length;
 
+        // Track which (ticket_id, mechanic_id) pairs still have an active varenummer line
+        // after this sync, so we can distinguish "mechanic replaced own line with new ID"
+        // (standard delta correction) from "mechanic's line was removed by someone else"
+        // (preserve any positive today_added already earned today).
+        const currentMechanicOnTicket = new Set(upserts.map((u) => `${u.ticket_id}:${u.mechanic_id}`));
+
         const invisibleUpserts = invisibleRows.map((row) => {
           const baselineQuantity = Number(row.baseline_quantity);
-          const todayAddedQuantity = 0 - baselineQuantity;
+          const mechanicReplacedOwnLine = currentMechanicOnTicket.has(`${row.ticket_id}:${row.mechanic_id}`);
+          // If mechanic still has another varenummer line on this ticket, apply the standard
+          // delta correction (the new line is counted separately, avoiding double-counting).
+          // Otherwise the mechanic's line was removed by someone else — preserve any positive
+          // today_added already counted for this row so the mechanic's work isn't erased.
+          const todayAddedQuantity = mechanicReplacedOwnLine
+            ? 0 - baselineQuantity
+            : Math.max(Number(row.today_added_quantity ?? 0), 0 - baselineQuantity);
 
           affectedMechanicIds.add(row.mechanic_id as string);
 
