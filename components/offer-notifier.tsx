@@ -15,7 +15,27 @@ type OfferNotification = {
   status: OfferStatus;
 };
 
-const DISMISS_AFTER_MS = 10_000;
+const DISMISS_AFTER_MS = 20_000;
+
+function playPling() {
+  try {
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.6);
+    oscillator.onended = () => ctx.close();
+  } catch {
+    // AudioContext not available (e.g. SSR guard)
+  }
+}
 
 const STATUS_CONFIG: Record<
   OfferStatus,
@@ -114,8 +134,21 @@ function NotificationCard({
           paddingRight: "20px",
         }}
       >
-        {notification.customer_name ?? "Ukendt kunde"}
+        {notification.mechanic_name ?? "Ukendt mekaniker"}
       </p>
+
+      {notification.work_order_id && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: "18px",
+            fontWeight: 700,
+            color: "rgba(255,255,255,0.55)",
+          }}
+        >
+          #{notification.work_order_id}
+        </p>
+      )}
 
       <div
         style={{
@@ -125,16 +158,6 @@ function NotificationCard({
           marginTop: "2px",
         }}
       >
-        {notification.mechanic_name && (
-          <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>
-            {notification.mechanic_name}
-          </span>
-        )}
-        {notification.work_order_id && (
-          <span style={{ fontSize: "13px", color: "rgba(255,255,255,0.4)" }}>
-            #{notification.work_order_id}
-          </span>
-        )}
         {amountLabel && (
           <span
             style={{
@@ -190,6 +213,7 @@ export function OfferNotifier() {
           if (seenIds.current.has(row.id)) return;
 
           seenIds.current.add(row.id);
+          playPling();
 
           const notification: OfferNotification = {
             id: row.id,
