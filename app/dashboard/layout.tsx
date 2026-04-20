@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { OfferNotifier } from "@/components/offer-notifier";
 import { getCurrentUser } from "@/lib/supabase/server-auth";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +15,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login?error=auth_not_configured");
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <OfferNotifier />
+    </>
+  );
 }
