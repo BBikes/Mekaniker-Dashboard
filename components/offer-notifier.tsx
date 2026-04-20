@@ -20,18 +20,27 @@ const DISMISS_AFTER_MS = 20_000;
 function playPling() {
   try {
     const ctx = new AudioContext();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    oscillator.start(ctx.currentTime);
-    oscillator.stop(ctx.currentTime + 0.6);
-    oscillator.onended = () => ctx.close();
+
+    function tone(freq: number, startTime: number, duration: number) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.4, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    }
+
+    // Two ascending tones like an incoming message notification
+    tone(830, ctx.currentTime, 0.18);
+    tone(1050, ctx.currentTime + 0.2, 0.22);
+
+    // Close context after both tones finish
+    window.setTimeout(() => ctx.close(), 600);
   } catch {
     // AudioContext not available (e.g. SSR guard)
   }
@@ -143,7 +152,7 @@ function NotificationCard({
             margin: 0,
             fontSize: "18px",
             fontWeight: 700,
-            color: "rgba(255,255,255,0.55)",
+            color: "#f1f5f9",
           }}
         >
           #{notification.work_order_id}
