@@ -1073,6 +1073,7 @@ async function validateKnownRows({
   mappings,
   mappingByItemNo,
   client,
+  prefetchedMaterialsByTicketId = new Map<number, NormalizedTicketMaterial[]>(),
 }: {
   statDate: string;
   now: string;
@@ -1080,6 +1081,7 @@ async function validateKnownRows({
   mappings: MechanicMapping[];
   mappingByItemNo: Map<string, MechanicMapping>;
   client: CustomersFirstClient;
+  prefetchedMaterialsByTicketId?: Map<number, NormalizedTicketMaterial[]>;
 }): Promise<ValidationResult> {
   const rowsToValidate = rows.filter((row) => {
     if (row.sync_state === "replaced") {
@@ -1105,7 +1107,22 @@ async function validateKnownRows({
   }
 
   const ticketIds = [...new Set(rowsToValidate.map((row) => row.ticket_id))];
-  const validationFetch = await fetchTicketScopedMaterials(ticketIds, client);
+  const ticketsToFetch = ticketIds.filter((id) => !prefetchedMaterialsByTicketId.has(id));
+  const freshFetch = ticketsToFetch.length > 0
+    ? await fetchTicketScopedMaterials(ticketsToFetch, client)
+    : { materialsByTicketId: new Map<number, NormalizedTicketMaterial[]>(), httpCalls: 0, materialsSeen: 0 };
+
+  const mergedMaterialsByTicketId = new Map<number, NormalizedTicketMaterial[]>([
+    ...prefetchedMaterialsByTicketId.entries(),
+    ...freshFetch.materialsByTicketId.entries(),
+  ]);
+
+  const validationFetch = {
+    httpCalls: freshFetch.httpCalls,
+    materialsSeen: freshFetch.materialsSeen + [...prefetchedMaterialsByTicketId.values()].reduce((s, m) => s + m.length, 0),
+    materialsByTicketId: mergedMaterialsByTicketId,
+  };
+
   const materialsById = new Map<number, NormalizedTicketMaterial>();
   const activeMaterialsByTicketMechanic = new Map<string, NormalizedTicketMaterial[]>();
   let mappedMaterialsSeen = 0;
@@ -1360,35 +1377,6 @@ export async function runPhaseOneSync(
 
       await upsertBaselineRows(upserts, "Failed to upsert filtered mechanic baseline rows");
       rowsUpserted += upserts.length;
-
-      const mergedRows = mergeTodayRows(todayRows, upserts);
-      const validation = await validateKnownRows({
-        statDate,
-        now,
-        rows: mergedRows,
-        mappings,
-        mappingByItemNo,
-        client,
-      });
-
-      await upsertBaselineRows(validation.upserts, "Failed to validate known mechanic baseline rows");
-      await logUnresolvedMissingRows({
-        syncLogId,
-        upserts: validation.upserts.filter((row) => row.sync_state === "unresolved_missing"),
-        mappings,
-      });
-      await markRecoveredAnomalyLog(statDate, validation.recoveredMaterialIds);
-
-      materialHttpCalls += validation.httpCalls;
-      materialsSeen += validation.materialsSeen;
-      mappedMaterialsSeen += validation.mappedMaterialsSeen;
-      rowsUpserted += validation.upserts.length;
-      rowsCorrected += validation.rowsCorrected;
-      anomalyCount += validation.anomalyCount;
-      validationTicketsChecked = validation.validationTicketsChecked;
-      visibilityAnomalies.push(...validation.unresolvedMissingMaterialIds);
-      unresolvedMissingMaterialIds.push(...validation.unresolvedMissingMaterialIds);
-      recoveredMaterialIds.push(...validation.recoveredMaterialIds);
 
       await recalculateTotals(statDate);
       await autoAcknowledgeMissingRows(statDate, now);
