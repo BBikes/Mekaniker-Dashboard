@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getDashboardPresentation } from "@/lib/data/dashboard";
+import { getDashboardAnomalySummary, getDashboardPresentation } from "@/lib/data/dashboard";
 import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
@@ -11,11 +11,18 @@ export async function GET() {
     return createUnauthorizedApiResponse();
   }
 
-  const dashboard = await getDashboardPresentation();
+  const [dashboard, anomalies] = await Promise.all([getDashboardPresentation(), getDashboardAnomalySummary()]);
 
   return NextResponse.json(
     {
       refreshToken: dashboard.refreshToken,
+      latestSync: dashboard.latestSync,
+      anomalies: {
+        hasIssues: anomalies.hasIssues,
+        totalMissingRows: anomalies.totalMissingRows,
+        affectedMechanics: anomalies.affectedMechanics,
+        latestSyncFinishedAt: anomalies.latestSyncFinishedAt,
+      },
     },
     {
       headers: {

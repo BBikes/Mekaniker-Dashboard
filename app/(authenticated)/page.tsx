@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
 import { InternalActions } from "@/components/internal-actions";
-import { getDashboardData } from "@/lib/data/dashboard";
+import { SyncAnomalyBanner } from "@/components/sync-anomaly-banner";
+import { getDashboardAnomalySummary, getDashboardData } from "@/lib/data/dashboard";
 import { getActiveMechanics } from "@/lib/data/reports";
 import { getDashboardReadinessMessage, getEnvPresence, getSyncReadinessMessage, toOperatorErrorMessage } from "@/lib/env";
 import { formatCopenhagenTime, formatHours } from "@/lib/time";
@@ -68,10 +69,15 @@ export default async function HomePage() {
     rows: [],
     latestSync: null,
   };
+  let anomalies: Awaited<ReturnType<typeof getDashboardAnomalySummary>> | null = null;
 
   if (env.dashboardReady) {
     try {
-      [dashboard, mechanics] = await Promise.all([getDashboardData(), getActiveMechanics()]);
+      [dashboard, mechanics, anomalies] = await Promise.all([
+        getDashboardData(),
+        getActiveMechanics(),
+        getDashboardAnomalySummary(),
+      ]);
     } catch (error) {
       loadError = toOperatorErrorMessage(error, "Kunne ikke hente data fra Supabase.");
     }
@@ -87,6 +93,7 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader activeHref="/" />
+      <SyncAnomalyBanner initialAnomalies={anomalies} />
       <main className="page-shell">
         <section className="hero">
           <div className="hero__top">

@@ -1214,3 +1214,105 @@ tr:last-child td {
     width: 100vw;
   }
 }
+
+/* ─── Sync anomaly banner ────────────────────────────────────────────────────── */
+
+.sync-anomaly-banner {
+  width: 100%;
+  background: linear-gradient(135deg, #7c2d12 0%, #9a3412 100%);
+  color: #fef3c7;
+  padding: 14px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+  box-shadow: 0 2px 12px rgba(180, 35, 24, 0.25);
+  animation: banner-slide-in 220ms ease-out;
+}
+
+@keyframes banner-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sync-anomaly-banner__body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.sync-anomaly-banner__icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sync-anomaly-banner__content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sync-anomaly-banner__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fef3c7;
+}
+
+.sync-anomaly-banner__sub {
+  font-size: 0.82rem;
+  color: rgba(254, 243, 199, 0.75);
+}
+
+.sync-anomaly-banner__mechanics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.sync-anomaly-banner__mechanic-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.82rem;
+}
+
+.sync-anomaly-banner__mechanic-name {
+  font-weight: 700;
+  color: #fef3c7;
+}
+
+.sync-anomaly-banner__mechanic-count {
+  color: rgba(254, 243, 199, 0.7);
+}
+
+.sync-anomaly-banner__dismiss {
+  appearance: none;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 999px;
+  color: #fef3c7;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  height: 28px;
+  line-height: 1;
+  padding: 0 10px;
+  transition: background 140ms ease;
+}
+
+.sync-anomaly-banner__dismiss:hover {
+  background: rgba(0, 0, 0, 0.38);
+}
+

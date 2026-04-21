@@ -5,7 +5,7 @@ import type { NormalizedTicketMaterial } from "@/lib/c1st/normalize-ticket-mater
 import { createAdminClient } from "@/lib/supabase/server";
 import { getServerConfig } from "@/lib/env";
 import { getDailyTargetHoursForDate } from "@/lib/targets";
-import { getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
+import { addDays, getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
 const SYNC_CURSOR_OVERLAP_MINUTES = 2;
@@ -390,7 +390,10 @@ async function loadPreviousRowsByMaterialId(statDate: string, ticketMaterialIds:
 }
 
 async function loadCarryForwardRows(statDate: string) {
-  const previousDate = dateDaysAgo(1);
+  // Use addDays(statDate, -1) instead of dateDaysAgo(1) to derive the previous date
+  // directly from statDate — not from the current wall-clock time. This prevents an
+  // off-by-one error when the function is called around midnight.
+  const previousDate = addDays(statDate, -1);
   const [todayRows, previousRows] = await Promise.all([loadRowsForDate(statDate), loadRowsForDate(previousDate)]);
   const existingToday = new Set(todayRows.map((row) => row.ticket_material_id));
 
@@ -975,13 +978,27 @@ export async function runPhaseOneSync(
         const invisibleUpserts = invisibleRows.map((row) => {
           const baselineQuantity = Number(row.baseline_quantity);
           const mechanicReplacedOwnLine = currentMechanicOnTicket.has(`${row.ticket_id}:${row.mechanic_id}`);
-          // If mechanic still has another varenummer line on this ticket, apply the standard
-          // delta correction (the new line is counted separately, avoiding double-counting).
-          // Otherwise the mechanic's line was removed by someone else — preserve any positive
-          // today_added already counted for this row so the mechanic's work isn't erased.
+
+          // When a mechanic replaced their own line with a new one, zero out this row so
+          // only the new line is counted (prevents double-counting).
+          //
+          // When the mechanic did NOT replace the line, we do NOT know whether the line
+          // was truly deleted in Bikedesk or just missed by the API call (pagination, timing,
+          // transient errors). Setting current_quantity to 0 in the latter case would:
+          //   1. Erase legitimately earned today_added quarters immediately.
+          //   2. Carry forward a baseline=0 tomorrow, causing double-counting if the line
+          //      reappears.
+          // Therefore we preserve the last-known current_quantity and today_added_quantity.
+          // The anomaly_code flag keeps the row visible for investigation. The next sync
+          // that successfully fetches the ticket's materials will overwrite these values
+          // with the ground truth from Bikedesk.
           const todayAddedQuantity = mechanicReplacedOwnLine
             ? 0 - baselineQuantity
-            : Math.max(Number(row.today_added_quantity ?? 0), 0 - baselineQuantity);
+            : Math.max(Number(row.today_added_quantity ?? 0), 0);
+
+          const currentQuantity = mechanicReplacedOwnLine
+            ? 0
+            : Number(row.current_quantity);
 
           affectedMechanicIds.add(row.mechanic_id as string);
 
@@ -992,7 +1009,7 @@ export async function runPhaseOneSync(
             mechanic_id: row.mechanic_id,
             mechanic_item_no: row.mechanic_item_no,
             baseline_quantity: roundNumber(baselineQuantity),
-            current_quantity: 0,
+            current_quantity: roundNumber(currentQuantity),
             today_added_quantity: roundNumber(todayAddedQuantity),
             today_added_hours: roundNumber(todayAddedQuantity * 0.25),
             source_updated_at: row.source_updated_at,
@@ -1012,7 +1029,81 @@ export async function runPhaseOneSync(
         if (error) {
           throw new Error(`Failed to flag visibility anomalies and update quantities: ${error.message}`);
         }
-      }
+
+        // === Verification re-fetch (double-sync) ===
+        // Immediately re-fetch materials for every ticket that had invisible rows.
+        // Goal: distinguish a transient API glitch (material reappears → correct it now)
+        // from a genuine deletion (material still absent → keep the preserved anomaly state).
+        // This avoids waiting up to 15 minutes for the next scheduled sync to self-heal.
+        const invisibleTicketIds = [...new Set(invisibleRows.map((row) => row.ticket_id))];
+        const invisibleMaterialIds = new Set(invisibleRows.map((row) => row.ticket_material_id));
+        const verificationFetch = await fetchTicketScopedMaterials(invisibleTicketIds);
+        materialHttpCalls += verificationFetch.httpCalls;
+
+        const recoveredUpserts: Array<Record<string, unknown>> = [];
+
+        for (const materials of verificationFetch.materialsByTicketId.values()) {
+          for (const material of materials) {
+            // Only act on materials that were flagged as invisible in this run
+            if (!invisibleMaterialIds.has(material.ticketMaterialId)) continue;
+
+            const productNo = material.productNo?.trim() ?? null;
+            if (!productNo) continue;
+
+            const mapping = mappingByItemNo.get(productNo);
+            if (!mapping) continue;
+
+            // Material reappeared — find its invisible row and recalculate correctly.
+            const savedRow = invisibleRows.find((r) => r.ticket_material_id === material.ticketMaterialId);
+            if (!savedRow) continue;
+
+            const baselineQuantity = Number(savedRow.baseline_quantity);
+            const currentQuantity = material.amount;
+            const todayAddedQuantity = currentQuantity - baselineQuantity;
+            const anomalyCode = buildBaselineAnomaly(savedRow, material, "sync");
+
+            // Remove from visibilityAnomalies and adjust counters since this row was recovered
+            const anomalyIdx = visibilityAnomalies.indexOf(material.ticketMaterialId);
+            if (anomalyIdx !== -1) {
+              visibilityAnomalies.splice(anomalyIdx, 1);
+              anomalyCount -= 1;
+              rowsCorrected -= 1;
+            }
+
+            recoveredUpserts.push({
+              stat_date: statDate,
+              ticket_material_id: material.ticketMaterialId,
+              ticket_id: material.ticketId,
+              mechanic_id: mapping.id,
+              mechanic_item_no: mapping.mechanic_item_no,
+              baseline_quantity: roundNumber(baselineQuantity),
+              current_quantity: roundNumber(currentQuantity),
+              today_added_quantity: roundNumber(todayAddedQuantity),
+              today_added_hours: roundNumber(todayAddedQuantity * 0.25),
+              source_updated_at: material.updatedAt ?? savedRow.source_updated_at ?? null,
+              source_payment_id: material.paymentId,
+              source_amountpaid: material.amountPaid,
+              ticket_type: ticketTypeByTicketId.get(material.ticketId) ?? savedRow.ticket_type ?? null,
+              line_total_incl_vat: material.totalInclVat ?? null,
+              last_seen_at: now,
+              anomaly_code: anomalyCode,
+              updated_at: now,
+            });
+          }
+        }
+
+        if (recoveredUpserts.length > 0) {
+          // Overwrite the preserved-state rows with corrected live data
+          const { error: recoveryError } = await supabase
+            .from("daily_ticket_item_baselines")
+            .upsert(recoveredUpserts, { onConflict: "stat_date,ticket_material_id" });
+
+          if (recoveryError) {
+            // Non-critical — the preserved state is still valid; next sync will self-heal
+            console.warn(`Verification re-fetch upsert failed: ${recoveryError.message}`);
+          }
+        }
+      } // end if (invisibleRows.length > 0)
 
       await recalculateTotals(statDate);
 

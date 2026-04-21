@@ -692,3 +692,72 @@ export async function getDashboardData() {
     latestSync: presentation.latestSync,
   };
 }
+
+// ─── Anomaly summary (admin banner) ───────────────────────────────────────────
+
+export type DashboardAnomalyMechanic = {
+  mechanicName: string;
+  mechanicItemNo: string;
+  missingRowCount: number;
+};
+
+export type DashboardAnomalySummary = {
+  hasIssues: boolean;
+  totalMissingRows: number;
+  affectedMechanics: DashboardAnomalyMechanic[];
+  latestSyncFinishedAt: string | null;
+};
+
+/**
+ * Returns a summary of today's `missing_in_latest_fetch` anomalies grouped by
+ * mechanic. Used exclusively by the admin control panel — not the TV dashboard.
+ */
+export async function getDashboardAnomalySummary(): Promise<DashboardAnomalySummary> {
+  const supabase = await createAdminClient();
+  const today = getCopenhagenDateString();
+
+  // Aggregate missing rows per mechanic for today
+  const { data: rows, error } = await supabase
+    .from("daily_ticket_item_baselines")
+    .select("mechanic_item_no, mechanic_id, mechanic_item_mapping(mechanic_name)")
+    .eq("stat_date", today)
+    .eq("anomaly_code", "missing_in_latest_fetch");
+
+  if (error || !rows) {
+    return { hasIssues: false, totalMissingRows: 0, affectedMechanics: [], latestSyncFinishedAt: null };
+  }
+
+  // Group by mechanic
+  const grouped = new Map<string, DashboardAnomalyMechanic>();
+  for (const row of rows) {
+    const itemNo = row.mechanic_item_no as string;
+    const entry = grouped.get(itemNo);
+    const mechanicName =
+      (row.mechanic_item_mapping as { mechanic_name?: string } | null)?.mechanic_name ?? itemNo;
+
+    if (entry) {
+      entry.missingRowCount += 1;
+    } else {
+      grouped.set(itemNo, { mechanicName, mechanicItemNo: itemNo, missingRowCount: 1 });
+    }
+  }
+
+  const affectedMechanics = [...grouped.values()].sort((a, b) => b.missingRowCount - a.missingRowCount);
+
+  // Latest sync finished_at for the timestamp label
+  const { data: syncRow } = await supabase
+    .from("sync_event_log")
+    .select("finished_at")
+    .eq("sync_type", "sync")
+    .eq("status", "completed")
+    .order("finished_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  return {
+    hasIssues: affectedMechanics.length > 0,
+    totalMissingRows: rows.length,
+    affectedMechanics,
+    latestSyncFinishedAt: syncRow?.finished_at ?? null,
+  };
+}
