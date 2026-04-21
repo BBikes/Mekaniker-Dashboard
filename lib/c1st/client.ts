@@ -461,7 +461,9 @@ export class CustomersFirstClient {
         const page = await this.listTicketMaterialsPage({ updatedAfter, productNo, paginationStart });
         httpCalls += 1;
 
-        const nonMatchingMaterial = page.normalizedItems.find((material) => material.productNo?.trim() !== productNo);
+        const nonMatchingMaterial = page.normalizedItems.find(
+          (material) => material.productNo !== null && material.productNo.trim() !== productNo,
+        );
         if (nonMatchingMaterial) {
           throw new Error(
             `Customers 1st material endpoint did not honor ${this.config.c1stTicketMaterialProductNoParam} filter for ${productNo}.`,

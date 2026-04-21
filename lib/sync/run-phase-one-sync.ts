@@ -454,6 +454,19 @@ async function loadCarryForwardRows(statDate: string) {
   );
 }
 
+async function autoAcknowledgeMissingRows(statDate: string, now: string) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("daily_ticket_item_baselines")
+    .update({ sync_state: "adjusted", resolved_at: now, updated_at: now })
+    .eq("stat_date", statDate)
+    .eq("sync_state", "unresolved_missing");
+
+  if (error) {
+    console.error("autoAcknowledgeMissingRows failed:", error.message);
+  }
+}
+
 async function recalculateTotals(statDate: string) {
   const activeMappings = await fetchActiveMappings();
   if (activeMappings.length === 0) {
@@ -1374,6 +1387,7 @@ export async function runPhaseOneSync(
       recoveredMaterialIds.push(...validation.recoveredMaterialIds);
 
       await recalculateTotals(statDate);
+      await autoAcknowledgeMissingRows(statDate, now);
 
       try {
         const config = getServerConfig();

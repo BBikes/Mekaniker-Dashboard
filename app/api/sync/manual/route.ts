@@ -5,6 +5,7 @@ import { runPhaseOneSync, type SyncMode } from "@/lib/sync/run-phase-one-sync";
 import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type RequestPayload = {
   mode?: SyncMode;
