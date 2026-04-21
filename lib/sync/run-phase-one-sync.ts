@@ -1404,6 +1404,7 @@ export async function runPhaseOneSync(
         paymentsUpserted: 0,
         paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
         paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+        paymentError: null,
         ticketLookupCount: 0,
         ticketLookupMissCount: 0,
       };
