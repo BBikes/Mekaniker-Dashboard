@@ -442,7 +442,7 @@ export class CustomersFirstClient {
   async listAllUpdatedTicketMaterialsForProductNos(
     updatedAfter: string,
     productNos: string[],
-  ): Promise<{ normalizedItems: NormalizedTicketMaterial[]; httpCalls: number }> {
+  ): Promise<{ normalizedItems: NormalizedTicketMaterial[]; httpCalls: number; skippedProductNos: string[] }> {
     if (!this.config.c1stUseUpdatedAfter) {
       throw new Error("Filtered Customers 1st material sync requires C1ST_USE_UPDATED_AFTER=true.");
     }
@@ -450,11 +450,13 @@ export class CustomersFirstClient {
     const normalizedProductNos = [...new Set(productNos.map((value) => value.trim()).filter(Boolean))];
     const seenMaterialIds = new Set<number>();
     const normalizedItems: NormalizedTicketMaterial[] = [];
+    const skippedProductNos: string[] = [];
     let httpCalls = 0;
 
     for (const productNo of normalizedProductNos) {
       let paginationStart = 0;
       let safetyCounter = 0;
+      let skipped = false;
 
       while (safetyCounter < 1000) {
         safetyCounter += 1;
@@ -465,9 +467,14 @@ export class CustomersFirstClient {
           (material) => material.productNo !== null && material.productNo.trim() !== productNo,
         );
         if (nonMatchingMaterial) {
-          throw new Error(
-            `Customers 1st material endpoint did not honor ${this.config.c1stTicketMaterialProductNoParam} filter for ${productNo}.`,
+          // API does not honor the productNo filter for this item — skip the filtered
+          // discovery pass. The validation (ticket-scoped) pass will still catch updates.
+          console.warn(
+            `[C1ST] ${this.config.c1stTicketMaterialProductNoParam} filter not honored for ${productNo} — skipping discovery, validation pass will cover it.`,
           );
+          skippedProductNos.push(productNo);
+          skipped = true;
+          break;
         }
 
         for (const material of page.normalizedItems) {
@@ -486,12 +493,12 @@ export class CustomersFirstClient {
         paginationStart = page.nextStart;
       }
 
-      if (safetyCounter >= 1000) {
+      if (!skipped && safetyCounter >= 1000) {
         throw new Error(`Stopped Customers 1st material pagination after 1000 pages for product ${productNo}`);
       }
     }
 
-    return { normalizedItems, httpCalls };
+    return { normalizedItems, httpCalls, skippedProductNos };
   }
 
   async getCykelPlusCustomerCount(tag: string): Promise<number> {

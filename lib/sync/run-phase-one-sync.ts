@@ -104,6 +104,7 @@ export type SyncResult = {
     validationTicketsChecked: number;
     unresolvedMissingMaterialIds: number[];
     recoveredMaterialIds: number[];
+    skippedProductNos: string[];
   };
   payment: PaymentSyncMetrics | null;
 };
@@ -1306,15 +1307,17 @@ export async function runPhaseOneSync(
     let missingProductNoCount = 0;
     let validationTicketsChecked = 0;
     let paymentWarning: string | null = null;
+    let skippedProductNos: string[] = [];
 
     if (mode === "sync") {
       const todayRows = await loadRowsForDate(statDate);
       const existingRowsByMaterialId = new Map(todayRows.map((row) => [row.ticket_material_id, row]));
       const updatedMaterialDiscovery = activeProductNos.length > 0
         ? await client.listAllUpdatedTicketMaterialsForProductNos(materialUpdatedAfter, activeProductNos)
-        : { normalizedItems: [] as NormalizedTicketMaterial[], httpCalls: 0 };
+        : { normalizedItems: [] as NormalizedTicketMaterial[], httpCalls: 0, skippedProductNos: [] as string[] };
       materialDiscoveryHttpCalls = updatedMaterialDiscovery.httpCalls;
       materialsSeen += updatedMaterialDiscovery.normalizedItems.length;
+      skippedProductNos = updatedMaterialDiscovery.skippedProductNos ?? [];
       const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
         statDate,
         [...new Set(updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketMaterialId))],
@@ -1459,6 +1462,7 @@ export async function runPhaseOneSync(
         validationTicketsChecked,
         unresolvedMissingMaterialIds,
         recoveredMaterialIds,
+        skippedProductNos: skippedProductNos ?? [],
       },
       payment,
     };
@@ -1489,6 +1493,7 @@ export async function runPhaseOneSync(
         payment_error: payment.paymentError,
         ticket_lookup_count: payment.ticketLookupCount,
         ticket_lookup_miss_count: payment.ticketLookupMissCount,
+        skipped_product_nos: skippedProductNos ?? [],
       },
     });
 
