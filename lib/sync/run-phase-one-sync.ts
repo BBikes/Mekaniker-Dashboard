@@ -1266,6 +1266,7 @@ export async function runPhaseOneSync(
           validationTicketsChecked: 0,
           unresolvedMissingMaterialIds: [],
           recoveredMaterialIds: [],
+          skippedProductNos: [],
         },
         payment: null,
       };
