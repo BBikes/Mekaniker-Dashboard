@@ -498,6 +498,32 @@ export class CustomersFirstClient {
       }
     }
 
+    // Fallback for skipped product numbers: C1st ignored the productNo filter, so do one
+    // unfiltered sweep and collect matching materials client-side. This ensures new tickets
+    // (not yet in daily_ticket_item_baselines) are still discovered for skipped mechanics.
+    if (skippedProductNos.length > 0) {
+      const skippedSet = new Set(skippedProductNos);
+      let fallbackStart = 0;
+      let fallbackCounter = 0;
+
+      while (fallbackCounter < 1000) {
+        fallbackCounter += 1;
+        const page = await this.listTicketMaterialsPage({ updatedAfter, paginationStart: fallbackStart });
+        httpCalls += 1;
+
+        for (const material of page.normalizedItems) {
+          const pNo = material.productNo?.trim();
+          if (!pNo || !skippedSet.has(pNo)) continue;
+          if (seenMaterialIds.has(material.ticketMaterialId)) continue;
+          seenMaterialIds.add(material.ticketMaterialId);
+          normalizedItems.push(material);
+        }
+
+        if (page.nextStart === null) break;
+        fallbackStart = page.nextStart;
+      }
+    }
+
     return { normalizedItems, httpCalls, skippedProductNos };
   }
 
