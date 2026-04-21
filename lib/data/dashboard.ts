@@ -709,7 +709,7 @@ export type DashboardAnomalySummary = {
 };
 
 /**
- * Returns a summary of today's `missing_in_latest_fetch` anomalies grouped by
+ * Returns a summary of today's unresolved mechanic-line sync errors grouped by
  * mechanic. Used exclusively by the admin control panel — not the TV dashboard.
  */
 export async function getDashboardAnomalySummary(): Promise<DashboardAnomalySummary> {
@@ -719,9 +719,9 @@ export async function getDashboardAnomalySummary(): Promise<DashboardAnomalySumm
   // Aggregate missing rows per mechanic for today
   const { data: rows, error } = await supabase
     .from("daily_ticket_item_baselines")
-    .select("mechanic_item_no, mechanic_id, mechanic_item_mapping(mechanic_name)")
+    .select("mechanic_item_no, mechanic_id, mechanic_item_mapping(mechanic_name, active)")
     .eq("stat_date", today)
-    .eq("anomaly_code", "missing_in_latest_fetch");
+    .eq("sync_state", "unresolved_missing");
 
   if (error || !rows) {
     return { hasIssues: false, totalMissingRows: 0, affectedMechanics: [], latestSyncFinishedAt: null };
@@ -730,10 +730,14 @@ export async function getDashboardAnomalySummary(): Promise<DashboardAnomalySumm
   // Group by mechanic
   const grouped = new Map<string, DashboardAnomalyMechanic>();
   for (const row of rows) {
+    const mechanic = row.mechanic_item_mapping as { mechanic_name?: string; active?: boolean } | null;
+    if (mechanic?.active === false) {
+      continue;
+    }
+
     const itemNo = row.mechanic_item_no as string;
     const entry = grouped.get(itemNo);
-    const mechanicName =
-      (row.mechanic_item_mapping as { mechanic_name?: string } | null)?.mechanic_name ?? itemNo;
+    const mechanicName = mechanic?.mechanic_name ?? itemNo;
 
     if (entry) {
       entry.missingRowCount += 1;
@@ -749,14 +753,14 @@ export async function getDashboardAnomalySummary(): Promise<DashboardAnomalySumm
     .from("sync_event_log")
     .select("finished_at")
     .eq("sync_type", "sync")
-    .eq("status", "completed")
+    .in("status", ["completed", "completed_with_warning"])
     .order("finished_at", { ascending: false })
     .limit(1)
     .single();
 
   return {
     hasIssues: affectedMechanics.length > 0,
-    totalMissingRows: rows.length,
+    totalMissingRows: affectedMechanics.reduce((sum, mechanic) => sum + mechanic.missingRowCount, 0),
     affectedMechanics,
     latestSyncFinishedAt: syncRow?.finished_at ?? null,
   };

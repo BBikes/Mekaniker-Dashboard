@@ -16,6 +16,7 @@ type ListTicketsOptions = PaginationOptions & {
 type ListTicketMaterialsOptions = PaginationOptions & {
   ticketId?: number;
   updatedAfter?: string;
+  productNo?: string;
 };
 
 export type NormalizedTicket = {
@@ -316,6 +317,10 @@ export class CustomersFirstClient {
       params.set(this.config.c1stUpdatedAfterParam, options.updatedAfter);
     }
 
+    if (options.productNo) {
+      params.set(this.config.c1stTicketMaterialProductNoParam, options.productNo);
+    }
+
     return this.requestPage({
       path: "/tickets/materials",
       params,
@@ -432,6 +437,59 @@ export class CustomersFirstClient {
       normalizedItems,
       httpCalls: pages.length,
     };
+  }
+
+  async listAllUpdatedTicketMaterialsForProductNos(
+    updatedAfter: string,
+    productNos: string[],
+  ): Promise<{ normalizedItems: NormalizedTicketMaterial[]; httpCalls: number }> {
+    if (!this.config.c1stUseUpdatedAfter) {
+      throw new Error("Filtered Customers 1st material sync requires C1ST_USE_UPDATED_AFTER=true.");
+    }
+
+    const normalizedProductNos = [...new Set(productNos.map((value) => value.trim()).filter(Boolean))];
+    const seenMaterialIds = new Set<number>();
+    const normalizedItems: NormalizedTicketMaterial[] = [];
+    let httpCalls = 0;
+
+    for (const productNo of normalizedProductNos) {
+      let paginationStart = 0;
+      let safetyCounter = 0;
+
+      while (safetyCounter < 1000) {
+        safetyCounter += 1;
+        const page = await this.listTicketMaterialsPage({ updatedAfter, productNo, paginationStart });
+        httpCalls += 1;
+
+        const nonMatchingMaterial = page.normalizedItems.find((material) => material.productNo?.trim() !== productNo);
+        if (nonMatchingMaterial) {
+          throw new Error(
+            `Customers 1st material endpoint did not honor ${this.config.c1stTicketMaterialProductNoParam} filter for ${productNo}.`,
+          );
+        }
+
+        for (const material of page.normalizedItems) {
+          if (seenMaterialIds.has(material.ticketMaterialId)) {
+            continue;
+          }
+
+          seenMaterialIds.add(material.ticketMaterialId);
+          normalizedItems.push(material);
+        }
+
+        if (page.nextStart === null) {
+          break;
+        }
+
+        paginationStart = page.nextStart;
+      }
+
+      if (safetyCounter >= 1000) {
+        throw new Error(`Stopped Customers 1st material pagination after 1000 pages for product ${productNo}`);
+      }
+    }
+
+    return { normalizedItems, httpCalls };
   }
 
   async getCykelPlusCustomerCount(tag: string): Promise<number> {

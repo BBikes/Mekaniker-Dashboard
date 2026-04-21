@@ -28,6 +28,7 @@ Valgfrit:
 - `C1ST_DEFAULT_PAGE_LENGTH`
 - `C1ST_USE_UPDATED_AFTER`
 - `C1ST_UPDATED_AFTER_PARAM`
+- `C1ST_TICKET_MATERIAL_PRODUCT_NO_PARAM`
 - `C1ST_EXTRA_TICKET_MATERIAL_QUERY`
 
 Bemark:
@@ -74,5 +75,5 @@ Aabn:
 - Scheduled route korer baseline plus normal sync uden historisk import.
 - Manuel sync er stadig tilgaengelig fra kontrolpanelet.
 - KPI beregnes kun ud fra de mekaniker-varenumre, der er oprettet under `/settings`.
-- Hvis Customers 1st understotter materiale-delta direkte, saet `C1ST_USE_UPDATED_AFTER=true` og juster evt. `C1ST_UPDATED_AFTER_PARAM`.
+- Customers 1st materiale-sync skal koere filtreret paa de aktive mekaniker-varenumre. Saet `C1ST_USE_UPDATED_AFTER=true` og juster evt. `C1ST_UPDATED_AFTER_PARAM` og `C1ST_TICKET_MATERIAL_PRODUCT_NO_PARAM`.
 - Hvis Customers 1st-kontrakten afviger fra antagelserne, juster normalizeren i `lib/c1st/normalize-ticket-material.ts`.
