@@ -1381,47 +1381,62 @@ export async function runPhaseOneSync(
       await recalculateTotals(statDate);
       await autoAcknowledgeMissingRows(statDate, now);
 
-      try {
-        const config = getServerConfig();
-        const cykelPlusCount = await client.getCykelPlusCustomerCount(config.cykelPlusTag);
-        await createAdminClient().from("cykelplus_snapshots").upsert(
-          { snapshot_date: statDate, customer_count: cykelPlusCount, updated_at: now },
-          { onConflict: "snapshot_date" },
-        );
-      } catch {
-        // Non-critical: CykelPlus should not block mechanic-hour sync.
+      const cykelPlusConfig = getServerConfig();
+      if (!cykelPlusConfig.syncSkipPayments) {
+        try {
+          const cykelPlusCount = await client.getCykelPlusCustomerCount(cykelPlusConfig.cykelPlusTag);
+          await createAdminClient().from("cykelplus_snapshots").upsert(
+            { snapshot_date: statDate, customer_count: cykelPlusCount, updated_at: now },
+            { onConflict: "snapshot_date" },
+          );
+        } catch {
+          // Non-critical: CykelPlus should not block mechanic-hour sync.
+        }
       }
     }
 
+    const paymentConfig = getServerConfig();
     let payment: PaymentSyncMetrics;
-    try {
-      payment = await syncPayments({
-        client,
-        paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
-        paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
-        ticketTypeByTicketId,
-        mappingByItemNo,
-        now,
-        statDate,
-      });
-    } catch (error) {
-      const paymentError = error instanceof Error ? error.message : String(error);
+    if (paymentConfig.syncSkipPayments && mode !== "payments_backfill") {
       payment = {
         httpCalls: 0,
         paymentsSeen: 0,
         paymentsUpserted: 0,
         paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
         paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
-        paymentError,
         ticketLookupCount: 0,
         ticketLookupMissCount: 0,
       };
+    } else {
+      try {
+        payment = await syncPayments({
+          client,
+          paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
+          paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+          ticketTypeByTicketId,
+          mappingByItemNo,
+          now,
+          statDate,
+        });
+      } catch (error) {
+        const paymentError = error instanceof Error ? error.message : String(error);
+        payment = {
+          httpCalls: 0,
+          paymentsSeen: 0,
+          paymentsUpserted: 0,
+          paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
+          paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+          paymentError,
+          ticketLookupCount: 0,
+          ticketLookupMissCount: 0,
+        };
 
-      if (mode === "payments_backfill") {
-        throw error;
+        if (mode === "payments_backfill") {
+          throw error;
+        }
+
+        paymentWarning = combineSyncMessages(paymentWarning, paymentError);
       }
-
-      paymentWarning = combineSyncMessages(paymentWarning, paymentError);
     }
 
     if (paymentWarning) {

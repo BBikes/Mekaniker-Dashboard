@@ -11,13 +11,13 @@ export function KpiRow({ kpis }: KpiRowProps) {
   return (
     <section className="panel-grid panel-grid--metrics">
       <article className="panel">
-        <p className="eyebrow">Timer i perioden</p>
-        <p className="metric">{formatHours(kpis.totalHours)}</p>
+        <p className="eyebrow">Kvarterer (15 min)</p>
+        <p className="metric">{formatDecimal(kpis.totalQuarters)}</p>
       </article>
 
       <article className="panel">
-        <p className="eyebrow">Kvarterer</p>
-        <p className="metric">{formatDecimal(kpis.totalQuarters)}</p>
+        <p className="eyebrow">Timer i perioden</p>
+        <p className="metric">{formatHours(kpis.totalHours)}</p>
       </article>
 
       <article className="panel">

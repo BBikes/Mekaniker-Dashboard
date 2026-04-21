@@ -59,6 +59,7 @@ export function getServerConfig() {
     c1stTicketMaterialProductNoParam: getOptionalEnv("C1ST_TICKET_MATERIAL_PRODUCT_NO_PARAM", "productno")!,
     c1stExtraTicketMaterialQuery: getOptionalEnv("C1ST_EXTRA_TICKET_MATERIAL_QUERY", "")!,
     cykelPlusTag: getOptionalEnv("CYKELPLUS_TAG", "CykelPlus")!,
+    syncSkipPayments: getOptionalEnv("SYNC_SKIP_PAYMENTS", "false") === "true",
   };
 }
 
