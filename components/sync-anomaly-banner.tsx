@@ -75,7 +75,16 @@ export function SyncAnomalyBanner({ pollMs = 60_000, initialAnomalies = null }: 
     };
   }, [pollMs]);
 
-  // Nothing to show
+  // When all issues are resolved (hasIssues → false), reset dismissed state so the
+  // next occurrence will always show the banner fresh rather than silently staying hidden.
+  useEffect(() => {
+    if (!anomalies?.hasIssues) {
+      setDismissed(false);
+      dismissedAtMissingCount.current = null;
+    }
+  }, [anomalies?.hasIssues]);
+
+  // Nothing to show: no issues, or user dismissed the current issue batch
   if (!anomalies?.hasIssues || dismissed) return null;
 
   function handleDismiss() {

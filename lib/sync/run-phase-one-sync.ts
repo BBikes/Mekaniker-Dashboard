@@ -1030,6 +1030,28 @@ export async function runPhaseOneSync(
           throw new Error(`Failed to flag visibility anomalies and update quantities: ${error.message}`);
         }
 
+        // Write to sync_anomaly_log — one row per missing material with before-state.
+        // Resolution starts as 'confirmed_missing' and is updated to 'auto_recovered'
+        // by the verification re-fetch below if the material reappears.
+        const anomalyLogInserts = invisibleUpserts.map((row) => ({
+          stat_date: statDate,
+          sync_event_id: syncLogId,
+          ticket_id: row.ticket_id,
+          ticket_material_id: row.ticket_material_id,
+          mechanic_item_no: row.mechanic_item_no,
+          mechanic_name:
+            mappings.find((m) => m.id === row.mechanic_id)?.mechanic_name ?? null,
+          previous_current_qty: row.current_quantity,
+          previous_today_added: row.today_added_quantity,
+          resolution: "confirmed_missing",
+          notes: `Missing from API fetch for ticket ${row.ticket_id}. Baseline: ${row.baseline_quantity}, today_added preserved: ${row.today_added_quantity}.`,
+        }));
+
+        // Best-effort — do not throw if anomaly log write fails
+        await supabase.from("sync_anomaly_log").insert(anomalyLogInserts).then(({ error: logErr }) => {
+          if (logErr) console.warn(`Anomaly log insert failed: ${logErr.message}`);
+        });
+
         // === Verification re-fetch (double-sync) ===
         // Immediately re-fetch materials for every ticket that had invisible rows.
         // Goal: distinguish a transient API glitch (material reappears → correct it now)
@@ -1102,6 +1124,21 @@ export async function runPhaseOneSync(
             // Non-critical — the preserved state is still valid; next sync will self-heal
             console.warn(`Verification re-fetch upsert failed: ${recoveryError.message}`);
           }
+
+          // Update anomaly log: mark recovered materials as 'auto_recovered'
+          // so the audit trail shows what was a glitch vs. what truly disappeared.
+          const recoveredMaterialIds = recoveredUpserts.map((r) => r.ticket_material_id);
+          await supabase
+            .from("sync_anomaly_log")
+            .update({
+              resolution: "auto_recovered",
+              notes: `Auto-recovered by double-sync verification on the same run. Material reappeared with correct quantities.`,
+            })
+            .eq("sync_event_id", syncLogId)
+            .in("ticket_material_id", recoveredMaterialIds)
+            .then(({ error: updateErr }) => {
+              if (updateErr) console.warn(`Anomaly log recovery update failed: ${updateErr.message}`);
+            });
         }
       } // end if (invisibleRows.length > 0)
 
