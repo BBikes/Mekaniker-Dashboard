@@ -18,9 +18,13 @@ select vault.create_secret(
   'Authorization secret used by Supabase Cron to call /api/cron/sync'
 );
 
+-- Kører én gang dagligt kl. 16:00 Copenhagen-tid.
+-- Supabase Cron bruger UTC:
+--   Sommertid (UTC+2, ca. marts–oktober): brug '0 14 * * *'
+--   Vintertid (UTC+1, ca. oktober–marts): brug '0 15 * * *'
 select cron.schedule(
   'bbikes-workshop-sync',
-  '*/15 * * * *',
+  '0 14 * * *',
   $$
   select
     net.http_post(
@@ -38,6 +42,12 @@ select cron.schedule(
   $$
 );
 
--- Useful inspection queries:
+-- Hvis jobbet allerede eksisterer og du kun vil opdatere tidsplanen:
+-- select cron.alter_job(
+--   job_id := (select jobid from cron.job where jobname = 'bbikes-workshop-sync'),
+--   schedule := '0 14 * * *'
+-- );
+
+-- Nyttige inspektionsforespørgsler:
 -- select jobid, jobname, schedule, command from cron.job order by jobid desc;
 -- select * from cron.job_run_details order by start_time desc limit 20;

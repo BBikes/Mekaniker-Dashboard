@@ -107,13 +107,22 @@ export function InternalActions({
           <p className="eyebrow">Manuelle handlinger</p>
           <h2>Probe og sync</h2>
         </div>
-        <p className="muted">Brug disse knapper som fallback eller til fejlsøgning af Customers 1st-sync.</p>
+        <p className="muted">"Sync" kører den fulde daglige sync (baseline + sync) — samme sekvens som den automatiske kl. 16:00. De øvrige knapper er til fejlsøgning.</p>
       </div>
 
       {disabledReason ? <p className="flash flash--error action-note">{disabledReason}</p> : null}
 
       <div className="action-row">
-        <button className="button" disabled={buttonsDisabled} onClick={() => run("Probe API", "/api/sync/probe")} type="button">
+        <button
+          className="button button--accent"
+          disabled={buttonsDisabled}
+          onClick={() => run("Sync", "/api/sync/full", { method: "POST" })}
+          type="button"
+          title="Kører baseline + sync — samme sekvens som den automatiske daglige sync"
+        >
+          {pendingLabel === "Sync" ? "Kører..." : "Sync"}
+        </button>
+        <button className="button button--ghost" disabled={buttonsDisabled} onClick={() => run("Probe API", "/api/sync/probe")} type="button">
           {pendingLabel === "Probe API" ? "Kører..." : "Probe API"}
         </button>
         <button
@@ -143,17 +152,17 @@ export function InternalActions({
           {pendingLabel === "Backfill betalinger (7 dage)" ? "Kører..." : "Backfill betalinger (7 dage)"}
         </button>
         <button
-          className="button button--accent"
+          className="button button--ghost"
           disabled={buttonsDisabled}
           onClick={() =>
-            run("Kør sync", "/api/sync/manual", {
+            run("Kør kun sync", "/api/sync/manual", {
               method: "POST",
               body: JSON.stringify({ mode: "sync" }),
             })
           }
           type="button"
         >
-          {pendingLabel === "Kør sync" ? "Kører..." : "Kør sync"}
+          {pendingLabel === "Kør kun sync" ? "Kører..." : "Kør kun sync"}
         </button>
       </div>
       <div className={`response-box ${state?.error ? "response-box--error" : ""}`}>

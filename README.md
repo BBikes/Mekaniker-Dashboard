@@ -71,9 +71,9 @@ Aabn:
 
 ## Noter
 
-- Automatisk 15-minutters sync korer via Supabase Cron og kalder `/api/cron/sync` med `CRON_SECRET`.
+- Automatisk daglig sync korer via Supabase Cron kl. 16:00 (UTC+2 sommertid) og kalder `/api/cron/sync` med `CRON_SECRET`. Se `supabase/admin/setup_supabase_cron.sql.example` for korrekt cron-udtryk.
 - Scheduled route korer baseline plus normal sync uden historisk import.
-- Manuel sync er stadig tilgaengelig fra kontrolpanelet.
+- Manuel sync er tilgaengelig fra kontrolpanelet via knappen "Sync" (korer baseline + sync, identisk med den automatiske cron-koersel).
 - KPI beregnes kun ud fra de mekaniker-varenumre, der er oprettet under `/settings`.
 - Customers 1st materiale-sync skal koere filtreret paa de aktive mekaniker-varenumre. Saet `C1ST_USE_UPDATED_AFTER=true` og juster evt. `C1ST_UPDATED_AFTER_PARAM` og `C1ST_TICKET_MATERIAL_PRODUCT_NO_PARAM`.
 - Hvis Customers 1st-kontrakten afviger fra antagelserne, juster normalizeren i `lib/c1st/normalize-ticket-material.ts`.

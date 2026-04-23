@@ -72,10 +72,10 @@ describe("dashboard windows", () => {
       toDate: "2026-04-08",
     });
 
-    // current_month: 1st of month to today
+    // current_month: 1st of month to yesterday (same as current_week, so only completed days are shown)
     expect(getDashboardWindow("current_month", "2026-04-09")).toMatchObject({
       fromDate: "2026-04-01",
-      toDate: "2026-04-09",
+      toDate: "2026-04-08",
     });
   });
 });

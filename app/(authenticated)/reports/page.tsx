@@ -168,8 +168,10 @@ function getQuickPresets() {
   const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
 
   return [
-    { label: "I dag", from: today, to: today },
     { label: "I går", from: toIsoDate(yesterday), to: toIsoDate(yesterday) },
+    { label: "Aktuel uge (man–i går)", from: toIsoDate(monday), to: toIsoDate(yesterday) },
+    { label: "Aktuel måned (1.–i går)", from: toIsoDate(firstOfMonth), to: toIsoDate(yesterday) },
+    { label: "I dag", from: today, to: today },
     { label: "Denne uge", from: toIsoDate(monday), to: toIsoDate(sunday) },
     { label: "Sidste uge", from: toIsoDate(lastWeekStart), to: toIsoDate(lastWeekEnd) },
     { label: "Denne måned", from: toIsoDate(firstOfMonth), to: toIsoDate(lastOfMonth) },

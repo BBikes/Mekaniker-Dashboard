@@ -259,13 +259,15 @@ export function getDashboardWindow(boardType: DashboardBoardType, today = getCop
         toDate: yesterday,
       };
     }
-    case "current_month":
+    case "current_month": {
+      const yesterday = addDays(today, -1);
       return {
         title: "Aktuel måned",
-        subtitle: "Denne måned til dato",
+        subtitle: "Denne måned til i går",
         fromDate: getStartOfMonth(today),
-        toDate: today,
+        toDate: yesterday,
       };
+    }
     case "mechanic_focus":
       return {
         title: "Mekaniker-fokus",
@@ -286,7 +288,7 @@ export function getDashboardWindow(boardType: DashboardBoardType, today = getCop
         subtitle: "Mandag til i dag",
         fromDate: getStartOfWeek(today),
         toDate: today,
-      };
+      }; // Revenue boards intentionally include today (payment data is real-time)
     case "revenue_current_month":
       return {
         title: "Omsætning aktuel måned",
@@ -464,6 +466,7 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
   const selectedMetricKeys = normalizeFocusMetricKeys(setting.selectedFocusMetricKeys);
 
   const yesterday = addDays(today, -1);
+  // currentMonth already ends at yesterday after the getDashboardWindow fix
   const [yesterdayTotals, weekTotals, monthTotals, yesterdayTargetHours, weekTargetHours, monthTargetHours] = await Promise.all([
     getAggregatedTotals(yesterday, yesterday),
     getAggregatedTotals(currentWeek.fromDate, currentWeek.toDate),
