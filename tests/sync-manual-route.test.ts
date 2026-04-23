@@ -64,8 +64,8 @@ describe("POST /api/sync/manual", () => {
       paymentBackfillDays: undefined,
       skipCykelPlusSync: true,
       skipPaymentSync: true,
-      useFilteredProductDiscovery: false,
-      liveWindowSnapshot: true,
+      useFilteredProductDiscovery: true,
+      materialLookbackHours: 48,
     });
   });
 

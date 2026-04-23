@@ -55,9 +55,10 @@ describe("dashboard windows", () => {
   it("resolves the configured dashboard periods", async () => {
     const { getDashboardWindow } = await import("@/lib/data/dashboard");
 
+    // "today" board shows yesterday's data
     expect(getDashboardWindow("today", "2026-04-09")).toMatchObject({
-      fromDate: "2026-04-09",
-      toDate: "2026-04-09",
+      fromDate: "2026-04-08",
+      toDate: "2026-04-08",
     });
 
     expect(getDashboardWindow("last_week", "2026-04-09")).toMatchObject({
@@ -65,11 +66,13 @@ describe("dashboard windows", () => {
       toDate: "2026-04-08",
     });
 
+    // current_week: Monday to yesterday
     expect(getDashboardWindow("current_week", "2026-04-09")).toMatchObject({
       fromDate: "2026-04-06",
-      toDate: "2026-04-09",
+      toDate: "2026-04-08",
     });
 
+    // current_month: 1st of month to today
     expect(getDashboardWindow("current_month", "2026-04-09")).toMatchObject({
       fromDate: "2026-04-01",
       toDate: "2026-04-09",

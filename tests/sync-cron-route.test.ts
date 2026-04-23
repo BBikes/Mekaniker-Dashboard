@@ -136,8 +136,8 @@ describe("scheduled sync route", () => {
     });
     expect(runPhaseOneSync).toHaveBeenNthCalledWith(1, "baseline");
     expect(runPhaseOneSync).toHaveBeenNthCalledWith(2, "sync", {
-      useFilteredProductDiscovery: false,
-      liveWindowSnapshot: true,
+      materialLookbackHours: 48,
+      useFilteredProductDiscovery: true,
     });
     expect(runPhaseOneSync.mock.invocationCallOrder[0]).toBeLessThan(runPhaseOneSync.mock.invocationCallOrder[1]);
     expect(aggregateScheduledMetrics).toHaveBeenCalledWith([

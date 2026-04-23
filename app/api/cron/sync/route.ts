@@ -32,8 +32,8 @@ async function handleScheduledSync(request: NextRequest) {
   try {
     const baseline = await runPhaseOneSync("baseline");
     const sync = await runPhaseOneSync("sync", {
-      useFilteredProductDiscovery: false,
-      liveWindowSnapshot: true,
+      materialLookbackHours: 48,
+      useFilteredProductDiscovery: true,
     });
     const metrics = aggregateScheduledMetrics([baseline, sync]);
 

@@ -157,6 +157,17 @@ describe("dashboard/report regressions", () => {
       ],
       daily_mechanic_totals: [
         {
+          // Yesterday (2026-04-13) — queried by the dashboard "today" board and focus board
+          stat_date: "2026-04-13",
+          mechanic_id: "m-1",
+          quarters_total: 8,
+          hours_total: 2,
+          target_hours: 8,
+          variance_hours: -6,
+          mechanic: { mechanic_name: "Alice" },
+        },
+        {
+          // Today (2026-04-14) — queried by the reports (explicit date range)
           stat_date: "2026-04-14",
           mechanic_id: "m-1",
           quarters_total: 8,
@@ -209,7 +220,7 @@ describe("dashboard/report regressions", () => {
       dashboard_view_settings: [
         {
           board_type: "today",
-          board_title: "I dag",
+          board_title: "I går",
           display_order: 0,
           duration_seconds: 20,
           active: true,

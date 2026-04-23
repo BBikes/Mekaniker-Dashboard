@@ -143,7 +143,7 @@ type DashboardWindow = {
 const DEFAULT_VIEW_SETTINGS: DashboardViewSetting[] = [
   {
     boardType: "today",
-    boardTitle: "I dag",
+    boardTitle: "I går",
     displayOrder: 0,
     durationSeconds: 20,
     active: true,
