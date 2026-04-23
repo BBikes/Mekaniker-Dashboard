@@ -240,7 +240,7 @@ async function fetchTicketScopedMaterials(ticketIds: number[], client = new Cust
   };
 }
 
-type UpdatedMaterialDiscovery = {
+type MaterialDiscovery = {
   normalizedItems: NormalizedTicketMaterial[];
   httpCalls: number;
   skippedProductNos: string[];
@@ -260,7 +260,7 @@ async function discoverUpdatedMaterials({
   useUpdatedAfter: boolean;
   allowFallbackSweep: boolean;
   client: CustomersFirstClient;
-}): Promise<UpdatedMaterialDiscovery> {
+}): Promise<MaterialDiscovery> {
   if (activeProductNos.length === 0) {
     return {
       normalizedItems: [],
@@ -316,6 +316,38 @@ async function discoverUpdatedMaterials({
     skippedProductNos: [],
     ticketTypeByTicketId,
     prefetchedMaterialsByTicketId: prefetchedMaterials.materialsByTicketId,
+  };
+}
+
+async function discoverLatestMaterials({
+  activeProductNos,
+  client,
+}: {
+  activeProductNos: string[];
+  client: CustomersFirstClient;
+}): Promise<MaterialDiscovery> {
+  if (activeProductNos.length === 0) {
+    return {
+      normalizedItems: [],
+      httpCalls: 0,
+      skippedProductNos: [],
+      ticketTypeByTicketId: new Map<number, string>(),
+      prefetchedMaterialsByTicketId: new Map<number, NormalizedTicketMaterial[]>(),
+    };
+  }
+
+  const materialSnapshot = await client.listAllTicketMaterials();
+  const activeProductNoSet = new Set(activeProductNos);
+
+  return {
+    normalizedItems: materialSnapshot.normalizedItems.filter((material) => {
+      const productNo = getProductNo(material);
+      return productNo ? activeProductNoSet.has(productNo) : false;
+    }),
+    httpCalls: materialSnapshot.httpCalls,
+    skippedProductNos: [],
+    ticketTypeByTicketId: new Map<number, string>(),
+    prefetchedMaterialsByTicketId: new Map<number, NormalizedTicketMaterial[]>(),
   };
 }
 
@@ -1072,7 +1104,7 @@ function buildMaterialUpsert({
   };
 }
 
-function buildLiveWindowSnapshotUpsert({
+function buildLiveSnapshotUpsert({
   statDate,
   now,
   syncLogId,
@@ -1103,7 +1135,7 @@ function buildLiveWindowSnapshotUpsert({
     today_added_hours: roundNumber(currentQuantity * 0.25),
     source_updated_at: material.updatedAt ?? todayRow?.source_updated_at ?? null,
     source_stat_date: resolveMaterialStatDate(material, statDate),
-    source_decision_reason: "included_recent_update_window",
+    source_decision_reason: "included_latest_snapshot",
     source_sync_event_id: syncLogId,
     source_payment_id: material.paymentId,
     source_amountpaid: material.amountPaid,
@@ -1119,7 +1151,7 @@ function buildLiveWindowSnapshotUpsert({
   };
 }
 
-function buildLiveWindowZeroedUpsert(row: DailyBaselineRow, now: string, syncLogId: string): DailyBaselineUpsert {
+function buildLiveSnapshotZeroedUpsert(row: DailyBaselineRow, now: string, syncLogId: string): DailyBaselineUpsert {
   return {
     stat_date: row.stat_date,
     ticket_material_id: row.ticket_material_id,
@@ -1132,7 +1164,7 @@ function buildLiveWindowZeroedUpsert(row: DailyBaselineRow, now: string, syncLog
     today_added_hours: 0,
     source_updated_at: row.source_updated_at,
     source_stat_date: row.source_stat_date ?? row.stat_date,
-    source_decision_reason: "excluded_from_recent_update_window",
+    source_decision_reason: "excluded_from_latest_snapshot",
     source_sync_event_id: syncLogId,
     source_payment_id: row.source_payment_id,
     source_amountpaid: row.source_amountpaid,
@@ -1671,9 +1703,15 @@ export async function runPhaseOneSync(
     const materialUpdatedAfter = mode === "sync"
       ? materialLookbackHours !== null
         ? hoursAgoIso(materialLookbackHours)
-        : await getLastSuccessfulSyncTimestamp()
+        : liveWindowSnapshot
+          ? null
+          : await getLastSuccessfulSyncTimestamp()
       : atStartOfDay(statDate);
-    const paymentWindow = await resolvePaymentUpdatedAfter(mode, materialUpdatedAfter, paymentBackfillDays);
+    const paymentWindow = await resolvePaymentUpdatedAfter(
+      mode,
+      materialUpdatedAfter ?? await getLastSuccessfulSyncTimestamp(),
+      paymentBackfillDays,
+    );
     const mappings = await fetchActiveMappings();
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
     const activeProductNos = getActiveProductNos(mappings);
@@ -1705,20 +1743,31 @@ export async function runPhaseOneSync(
         mapping: MechanicMapping;
         materialStatDate: string | null;
       }> = [];
-      const discoveryStrategy = liveWindowSnapshot || !useFilteredProductDiscovery ? "tickets_then_materials" : "materials_by_product";
+      const discoveryStrategy = liveWindowSnapshot
+        ? materialUpdatedAfter
+          ? "ticket_window_snapshot"
+          : "latest_material_snapshot"
+        : !useFilteredProductDiscovery
+          ? "tickets_then_materials"
+          : "materials_by_product";
       console.info("[sync] material discovery start", {
         syncLogId,
         strategy: discoveryStrategy,
         updatedAfter: materialUpdatedAfter,
         activeProductCount: activeProductNos.length,
       });
-      const updatedMaterialDiscovery = await discoverUpdatedMaterials({
-        updatedAfter: materialUpdatedAfter,
-        activeProductNos,
-        useUpdatedAfter: liveWindowSnapshot ? false : useFilteredProductDiscovery,
-        allowFallbackSweep: !strictProductDiscovery,
-        client,
-      });
+      const updatedMaterialDiscovery = liveWindowSnapshot && materialUpdatedAfter === null
+        ? await discoverLatestMaterials({
+            activeProductNos,
+            client,
+          })
+        : await discoverUpdatedMaterials({
+            updatedAfter: materialUpdatedAfter ?? atStartOfDay(statDate),
+            activeProductNos,
+            useUpdatedAfter: liveWindowSnapshot ? false : useFilteredProductDiscovery,
+            allowFallbackSweep: !strictProductDiscovery,
+            client,
+          });
       materialDiscoveryHttpCalls = updatedMaterialDiscovery.httpCalls;
       materialsSeen += updatedMaterialDiscovery.normalizedItems.length;
       skippedProductNos = updatedMaterialDiscovery.skippedProductNos ?? [];
@@ -1757,7 +1806,7 @@ export async function runPhaseOneSync(
         affectedMechanicIds.add(mapping.id);
         seenMaterialIds.add(material.ticketMaterialId);
         const upsert = liveWindowSnapshot
-          ? buildLiveWindowSnapshotUpsert({
+          ? buildLiveSnapshotUpsert({
               statDate,
               now,
               syncLogId,
@@ -1800,7 +1849,7 @@ export async function runPhaseOneSync(
             continue;
           }
 
-          upserts.push(buildLiveWindowZeroedUpsert(row, now, syncLogId));
+          upserts.push(buildLiveSnapshotZeroedUpsert(row, now, syncLogId));
         }
       }
 

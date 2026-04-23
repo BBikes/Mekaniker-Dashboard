@@ -214,6 +214,7 @@ type MockCustomersFirstClient = {
   listAllUpdatedTickets: ReturnType<typeof vi.fn>;
   listAllUpdatedTicketMaterials: ReturnType<typeof vi.fn>;
   listAllUpdatedTicketMaterialsForProductNos: ReturnType<typeof vi.fn>;
+  listAllTicketMaterials: ReturnType<typeof vi.fn>;
   listAllTicketMaterialsForTicket: ReturnType<typeof vi.fn>;
   listAllUpdatedPayments: ReturnType<typeof vi.fn>;
   getCykelPlusCustomerCount: ReturnType<typeof vi.fn>;
@@ -225,6 +226,7 @@ function createMockClient(overrides: Partial<MockCustomersFirstClient> = {}): Mo
     listAllUpdatedTickets: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
     listAllUpdatedTicketMaterials: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
     listAllUpdatedTicketMaterialsForProductNos: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
+    listAllTicketMaterials: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
     listAllTicketMaterialsForTicket: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
     listAllUpdatedPayments: vi.fn(async () => ({ normalizedItems: [], httpCalls: 0 })),
     getCykelPlusCustomerCount: vi.fn(async () => 0),
@@ -515,7 +517,7 @@ describe("runPhaseOneSync", () => {
     );
   });
 
-  it("builds a live 48 hour snapshot from updated tickets and zeroes stale today rows", async () => {
+  it("builds a latest snapshot from all materials and zeroes stale today rows", async () => {
     const state = createStateWithRows([
       createBaselineRow({
         ticket_material_id: 99,
@@ -525,7 +527,7 @@ describe("runPhaseOneSync", () => {
         today_added_quantity: 6,
         today_added_hours: 1.5,
         source_stat_date: "2026-04-14",
-        source_decision_reason: "included_recent_update_window",
+        source_decision_reason: "included_latest_snapshot",
       }),
     ]);
     const material = createMaterial({
@@ -537,31 +539,22 @@ describe("runPhaseOneSync", () => {
       totalInclVat: 400,
     });
     const client = createMockClient({
-      listAllUpdatedTickets: vi.fn(async () => ({
-        normalizedItems: [
-          {
-            ticketId: 500,
-            ticketType: "repair",
-            updatedAt: "2026-04-14T10:16:00.000Z",
-            createdAt: "2026-04-13T09:00:00.000Z",
-            raw: {},
-          },
-        ],
+      listAllTicketMaterials: vi.fn(async () => ({
+        normalizedItems: [material],
         httpCalls: 1,
       })),
-      listAllTicketMaterialsForTicket: createTicketMaterialFetcher([material]),
     });
 
     const { runPhaseOneSync } = await loadSyncModule(state, client, { syncSkipPayments: true });
     const result = await runPhaseOneSync("sync", {
-      materialLookbackHours: 48,
       useFilteredProductDiscovery: false,
       liveWindowSnapshot: true,
     });
 
     expect(client.listAllUpdatedTicketMaterialsForProductNos).not.toHaveBeenCalled();
-    expect(client.listAllUpdatedTickets).toHaveBeenCalledWith(expect.any(String));
-    expect(client.listAllTicketMaterialsForTicket).toHaveBeenCalledWith(500);
+    expect(client.listAllUpdatedTickets).not.toHaveBeenCalled();
+    expect(client.listAllTicketMaterialsForTicket).not.toHaveBeenCalled();
+    expect(client.listAllTicketMaterials).toHaveBeenCalledTimes(1);
     expect(result.payment?.paymentsSeen).toBe(0);
     expect(result.details.validationTicketsChecked).toBe(0);
 
@@ -574,7 +567,7 @@ describe("runPhaseOneSync", () => {
           today_added_quantity: 8,
           today_added_hours: 2,
           source_stat_date: "2026-04-13",
-          source_decision_reason: "included_recent_update_window",
+          source_decision_reason: "included_latest_snapshot",
           source_sync_event_id: result.syncLogId,
         }),
         expect.objectContaining({
@@ -583,7 +576,7 @@ describe("runPhaseOneSync", () => {
           current_quantity: 0,
           today_added_quantity: 0,
           today_added_hours: 0,
-          source_decision_reason: "excluded_from_recent_update_window",
+          source_decision_reason: "excluded_from_latest_snapshot",
           source_sync_event_id: result.syncLogId,
         }),
       ]),

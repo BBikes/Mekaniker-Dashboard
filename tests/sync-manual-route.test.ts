@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe("POST /api/sync/manual", () => {
-  it("uses a 48 hour ticket-scoped sync by default", async () => {
+  it("uses a latest snapshot sync by default", async () => {
     const runPhaseOneSync = vi.fn(async () => buildSyncResult("sync"));
     const { route } = await loadRoute(runPhaseOneSync);
 
@@ -61,7 +61,6 @@ describe("POST /api/sync/manual", () => {
 
     expect(response.status).toBe(200);
     expect(runPhaseOneSync).toHaveBeenCalledWith("sync", {
-      materialLookbackHours: 48,
       paymentBackfillDays: undefined,
       skipCykelPlusSync: true,
       skipPaymentSync: true,

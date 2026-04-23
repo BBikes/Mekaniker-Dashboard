@@ -8,7 +8,7 @@ type ActionState = {
   error: boolean;
 } | null;
 
-const MANUAL_ACTION_TIMEOUT_MS = 60_000;
+const MANUAL_ACTION_TIMEOUT_MS = 240_000;
 
 function toUiErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -146,14 +146,14 @@ export function InternalActions({
           className="button button--accent"
           disabled={buttonsDisabled}
           onClick={() =>
-            run("Kør 48 timers sync", "/api/sync/manual", {
+            run("Kør sync", "/api/sync/manual", {
               method: "POST",
-              body: JSON.stringify({ mode: "sync", lookbackHours: 48 }),
+              body: JSON.stringify({ mode: "sync" }),
             })
           }
           type="button"
         >
-          {pendingLabel === "Kør 48 timers sync" ? "Kører..." : "Kør 48 timers sync"}
+          {pendingLabel === "Kør sync" ? "Kører..." : "Kør sync"}
         </button>
       </div>
       <div className={`response-box ${state?.error ? "response-box--error" : ""}`}>

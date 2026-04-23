@@ -136,7 +136,6 @@ describe("scheduled sync route", () => {
     });
     expect(runPhaseOneSync).toHaveBeenNthCalledWith(1, "baseline");
     expect(runPhaseOneSync).toHaveBeenNthCalledWith(2, "sync", {
-      materialLookbackHours: 48,
       useFilteredProductDiscovery: false,
       liveWindowSnapshot: true,
     });

@@ -176,6 +176,52 @@ describe("CustomersFirstClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("lists all ticket materials across pages without updated_after", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          content: [
+            {
+              id: 1,
+              taskid: 101,
+              productno: "2403B15",
+              amount: 2,
+              updated_at: "2026-04-22 12:00:00",
+            },
+            {
+              id: 2,
+              taskid: 102,
+              productno: "3826B15",
+              amount: 3,
+              updated_at: "2026-04-22 13:00:00",
+            },
+          ],
+          total: 3,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          content: [
+            {
+              id: 3,
+              taskid: 103,
+              productno: "0064B15",
+              amount: 1,
+              updated_at: "2026-04-22 14:00:00",
+            },
+          ],
+          total: 3,
+        }),
+      );
+
+    const client = new CustomersFirstClient();
+    const result = await client.listAllTicketMaterials();
+
+    expect(result.httpCalls).toBe(2);
+    expect(result.normalizedItems).toHaveLength(3);
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("updated_after=");
+  });
+
   it(
     "fails with a timeout error when Customers 1st stops responding",
     async () => {
