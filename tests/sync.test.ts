@@ -464,7 +464,7 @@ describe("runPhaseOneSync", () => {
     );
   });
 
-  it("falls back to ticket-scoped discovery when filtered material sync is disabled", async () => {
+  it("falls back to ticket-scoped discovery when sync explicitly disables filtered material discovery", async () => {
     const state = createStateWithRows([createBaselineRow()]);
     const material = createMaterial({
       amount: 8,
@@ -487,8 +487,8 @@ describe("runPhaseOneSync", () => {
       listAllTicketMaterialsForTicket: createTicketMaterialFetcher([material]),
     });
 
-    const { runPhaseOneSync } = await loadSyncModule(state, client, { c1stUseUpdatedAfter: false });
-    const result = await runPhaseOneSync("sync");
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const result = await runPhaseOneSync("sync", { useFilteredProductDiscovery: false });
 
     expect(client.listAllUpdatedTicketMaterialsForProductNos).not.toHaveBeenCalled();
     expect(client.listAllUpdatedTickets).toHaveBeenCalledWith("2026-04-14T10:13:00.000Z");

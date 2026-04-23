@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 describe("POST /api/sync/manual", () => {
-  it("uses a strict 48 hour filtered sync by default", async () => {
+  it("uses a 48 hour ticket-scoped sync by default", async () => {
     const runPhaseOneSync = vi.fn(async () => buildSyncResult("sync"));
     const { route } = await loadRoute(runPhaseOneSync);
 
@@ -65,8 +65,7 @@ describe("POST /api/sync/manual", () => {
       paymentBackfillDays: undefined,
       skipCykelPlusSync: true,
       skipPaymentSync: true,
-      useFilteredProductDiscovery: true,
-      strictProductDiscovery: true,
+      useFilteredProductDiscovery: false,
     });
   });
 

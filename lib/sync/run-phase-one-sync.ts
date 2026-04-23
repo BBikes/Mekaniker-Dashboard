@@ -1493,7 +1493,7 @@ export async function runPhaseOneSync(
     const syncConfig = getServerConfig();
     const skipPaymentSync = options.skipPaymentSync === true;
     const skipCykelPlusSync = options.skipCykelPlusSync === true;
-    const useFilteredProductDiscovery = options.useFilteredProductDiscovery === true || syncConfig.c1stUseUpdatedAfter;
+    const useFilteredProductDiscovery = options.useFilteredProductDiscovery ?? syncConfig.c1stUseUpdatedAfter;
     const strictProductDiscovery = options.strictProductDiscovery === true;
     console.info("[sync] started", {
       mode,

@@ -43,8 +43,7 @@ export async function POST(request: NextRequest) {
             materialLookbackHours: lookbackHours,
             skipCykelPlusSync: true,
             skipPaymentSync: true,
-            useFilteredProductDiscovery: true,
-            strictProductDiscovery: true,
+            useFilteredProductDiscovery: false,
           }
         : {};
     const result = await runPhaseOneSync(mode, {
