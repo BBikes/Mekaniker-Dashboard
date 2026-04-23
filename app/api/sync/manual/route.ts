@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
             skipCykelPlusSync: true,
             skipPaymentSync: true,
             useFilteredProductDiscovery: false,
+            liveWindowSnapshot: true,
           }
         : {};
     const result = await runPhaseOneSync(mode, {

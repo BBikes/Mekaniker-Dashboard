@@ -66,6 +66,7 @@ describe("POST /api/sync/manual", () => {
       skipCykelPlusSync: true,
       skipPaymentSync: true,
       useFilteredProductDiscovery: false,
+      liveWindowSnapshot: true,
     });
   });
 

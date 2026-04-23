@@ -515,6 +515,92 @@ describe("runPhaseOneSync", () => {
     );
   });
 
+  it("builds a live 48 hour snapshot from updated tickets and zeroes stale today rows", async () => {
+    const state = createStateWithRows([
+      createBaselineRow({
+        ticket_material_id: 99,
+        ticket_id: 900,
+        baseline_quantity: 6,
+        current_quantity: 6,
+        today_added_quantity: 6,
+        today_added_hours: 1.5,
+        source_stat_date: "2026-04-14",
+        source_decision_reason: "included_recent_update_window",
+      }),
+    ]);
+    const material = createMaterial({
+      ticketMaterialId: 11,
+      ticketId: 500,
+      amount: 8,
+      sourceDate: "2026-04-13",
+      updatedAt: "2026-04-14T10:16:00.000Z",
+      totalInclVat: 400,
+    });
+    const client = createMockClient({
+      listAllUpdatedTickets: vi.fn(async () => ({
+        normalizedItems: [
+          {
+            ticketId: 500,
+            ticketType: "repair",
+            updatedAt: "2026-04-14T10:16:00.000Z",
+            createdAt: "2026-04-13T09:00:00.000Z",
+            raw: {},
+          },
+        ],
+        httpCalls: 1,
+      })),
+      listAllTicketMaterialsForTicket: createTicketMaterialFetcher([material]),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client, { syncSkipPayments: true });
+    const result = await runPhaseOneSync("sync", {
+      materialLookbackHours: 48,
+      useFilteredProductDiscovery: false,
+      liveWindowSnapshot: true,
+    });
+
+    expect(client.listAllUpdatedTicketMaterialsForProductNos).not.toHaveBeenCalled();
+    expect(client.listAllUpdatedTickets).toHaveBeenCalledWith(expect.any(String));
+    expect(client.listAllTicketMaterialsForTicket).toHaveBeenCalledWith(500);
+    expect(result.payment?.paymentsSeen).toBe(0);
+    expect(result.details.validationTicketsChecked).toBe(0);
+
+    expect(state.daily_ticket_item_baselines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 11,
+          stat_date: "2026-04-14",
+          current_quantity: 8,
+          today_added_quantity: 8,
+          today_added_hours: 2,
+          source_stat_date: "2026-04-13",
+          source_decision_reason: "included_recent_update_window",
+          source_sync_event_id: result.syncLogId,
+        }),
+        expect.objectContaining({
+          ticket_material_id: 99,
+          stat_date: "2026-04-14",
+          current_quantity: 0,
+          today_added_quantity: 0,
+          today_added_hours: 0,
+          source_decision_reason: "excluded_from_recent_update_window",
+          source_sync_event_id: result.syncLogId,
+        }),
+      ]),
+    );
+
+    expect(state.daily_mechanic_totals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stat_date: "2026-04-14",
+          mechanic_id: "m-1",
+          quarters_total: 8,
+          hours_total: 2,
+        }),
+      ]),
+    );
+  });
+
   it("preserves today's quantity and marks known missing lines as unresolved", async () => {
     const state = createStateWithRows([
       createBaselineRow({

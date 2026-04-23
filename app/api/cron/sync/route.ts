@@ -9,6 +9,7 @@ import {
 import { isCronAuthorized } from "@/lib/supabase/server-auth";
 
 export const runtime = "nodejs";
+const DEFAULT_SYNC_LOOKBACK_HOURS = 48;
 
 async function handleScheduledSync(request: NextRequest) {
   if (!isCronAuthorized(request)) {
@@ -31,7 +32,11 @@ async function handleScheduledSync(request: NextRequest) {
 
   try {
     const baseline = await runPhaseOneSync("baseline");
-    const sync = await runPhaseOneSync("sync");
+    const sync = await runPhaseOneSync("sync", {
+      materialLookbackHours: DEFAULT_SYNC_LOOKBACK_HOURS,
+      useFilteredProductDiscovery: false,
+      liveWindowSnapshot: true,
+    });
     const metrics = aggregateScheduledMetrics([baseline, sync]);
 
     await completeScheduledSyncRun(scheduledRun.syncLogId, {

@@ -1072,6 +1072,82 @@ function buildMaterialUpsert({
   };
 }
 
+function buildLiveWindowSnapshotUpsert({
+  statDate,
+  now,
+  syncLogId,
+  material,
+  mapping,
+  todayRow,
+  ticketType,
+}: {
+  statDate: string;
+  now: string;
+  syncLogId: string;
+  material: NormalizedTicketMaterial;
+  mapping: MechanicMapping;
+  todayRow?: DailyBaselineRow;
+  ticketType?: string | null;
+}): DailyBaselineUpsert {
+  const currentQuantity = roundNumber(material.amount);
+
+  return {
+    stat_date: statDate,
+    ticket_material_id: material.ticketMaterialId,
+    ticket_id: material.ticketId,
+    mechanic_id: mapping.id,
+    mechanic_item_no: mapping.mechanic_item_no,
+    baseline_quantity: 0,
+    current_quantity: currentQuantity,
+    today_added_quantity: currentQuantity,
+    today_added_hours: roundNumber(currentQuantity * 0.25),
+    source_updated_at: material.updatedAt ?? todayRow?.source_updated_at ?? null,
+    source_stat_date: resolveMaterialStatDate(material, statDate),
+    source_decision_reason: "included_recent_update_window",
+    source_sync_event_id: syncLogId,
+    source_payment_id: material.paymentId,
+    source_amountpaid: material.amountPaid,
+    ticket_type: ticketType ?? todayRow?.ticket_type ?? null,
+    line_total_incl_vat: material.totalInclVat ?? todayRow?.line_total_incl_vat ?? null,
+    last_seen_at: now,
+    anomaly_code: null,
+    sync_state: "ok",
+    last_validated_at: now,
+    missing_since: null,
+    resolved_at: null,
+    updated_at: now,
+  };
+}
+
+function buildLiveWindowZeroedUpsert(row: DailyBaselineRow, now: string, syncLogId: string): DailyBaselineUpsert {
+  return {
+    stat_date: row.stat_date,
+    ticket_material_id: row.ticket_material_id,
+    ticket_id: row.ticket_id,
+    mechanic_id: row.mechanic_id,
+    mechanic_item_no: row.mechanic_item_no,
+    baseline_quantity: 0,
+    current_quantity: 0,
+    today_added_quantity: 0,
+    today_added_hours: 0,
+    source_updated_at: row.source_updated_at,
+    source_stat_date: row.source_stat_date ?? row.stat_date,
+    source_decision_reason: "excluded_from_recent_update_window",
+    source_sync_event_id: syncLogId,
+    source_payment_id: row.source_payment_id,
+    source_amountpaid: row.source_amountpaid,
+    ticket_type: row.ticket_type ?? null,
+    line_total_incl_vat: row.line_total_incl_vat ?? null,
+    last_seen_at: row.last_seen_at,
+    anomaly_code: null,
+    sync_state: "ok",
+    last_validated_at: now,
+    missing_since: null,
+    resolved_at: now,
+    updated_at: now,
+  };
+}
+
 function buildUnresolvedMissingUpsert(row: DailyBaselineRow, now: string, syncLogId: string): DailyBaselineUpsert {
   const todayAddedQuantity = Number(row.today_added_quantity ?? 0);
 
@@ -1478,6 +1554,7 @@ export async function runPhaseOneSync(
     skipPaymentSync?: boolean;
     useFilteredProductDiscovery?: boolean;
     strictProductDiscovery?: boolean;
+    liveWindowSnapshot?: boolean;
   } = {},
 ): Promise<SyncResult> {
   const syncLogId = await createSyncLog(mode);
@@ -1495,6 +1572,7 @@ export async function runPhaseOneSync(
     const skipCykelPlusSync = options.skipCykelPlusSync === true;
     const useFilteredProductDiscovery = options.useFilteredProductDiscovery ?? syncConfig.c1stUseUpdatedAfter;
     const strictProductDiscovery = options.strictProductDiscovery === true;
+    const liveWindowSnapshot = options.liveWindowSnapshot === true;
     console.info("[sync] started", {
       mode,
       syncLogId,
@@ -1505,6 +1583,7 @@ export async function runPhaseOneSync(
       skipCykelPlusSync,
       useFilteredProductDiscovery,
       strictProductDiscovery,
+      liveWindowSnapshot,
     });
 
     if (mode === "baseline") {
@@ -1626,7 +1705,7 @@ export async function runPhaseOneSync(
         mapping: MechanicMapping;
         materialStatDate: string | null;
       }> = [];
-      const discoveryStrategy = useFilteredProductDiscovery ? "materials_by_product" : "tickets_then_materials";
+      const discoveryStrategy = liveWindowSnapshot || !useFilteredProductDiscovery ? "tickets_then_materials" : "materials_by_product";
       console.info("[sync] material discovery start", {
         syncLogId,
         strategy: discoveryStrategy,
@@ -1636,7 +1715,7 @@ export async function runPhaseOneSync(
       const updatedMaterialDiscovery = await discoverUpdatedMaterials({
         updatedAfter: materialUpdatedAfter,
         activeProductNos,
-        useUpdatedAfter: useFilteredProductDiscovery,
+        useUpdatedAfter: liveWindowSnapshot ? false : useFilteredProductDiscovery,
         allowFallbackSweep: !strictProductDiscovery,
         client,
       });
@@ -1651,6 +1730,7 @@ export async function runPhaseOneSync(
         [...new Set(updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketMaterialId))],
       );
       const upserts: DailyBaselineUpsert[] = [];
+      const seenMaterialIds = new Set<number>();
 
       for (const material of updatedMaterialDiscovery.normalizedItems) {
         const productNo = getProductNo(material);
@@ -1667,7 +1747,7 @@ export async function runPhaseOneSync(
         }
 
         const materialStatDate = resolveMaterialStatDate(material, statDate);
-        if (materialStatDate !== statDate) {
+        if (!liveWindowSnapshot && materialStatDate !== statDate) {
           visibilityAnomalies.push(material.ticketMaterialId);
           outOfDateMappedRows.push({ material, mapping, materialStatDate });
           continue;
@@ -1675,18 +1755,29 @@ export async function runPhaseOneSync(
 
         mappedMaterialsSeen += 1;
         affectedMechanicIds.add(mapping.id);
-        const upsert = buildMaterialUpsert({
-          statDate,
-          now,
-          syncLogId,
-          material,
-          mapping,
-          todayRow: existingRowsByMaterialId.get(material.ticketMaterialId),
-          previousRow: previousRowsByMaterialId.get(material.ticketMaterialId),
-          ticketType: ticketTypeByTicketId.get(material.ticketId) ?? null,
-        });
+        seenMaterialIds.add(material.ticketMaterialId);
+        const upsert = liveWindowSnapshot
+          ? buildLiveWindowSnapshotUpsert({
+              statDate,
+              now,
+              syncLogId,
+              material,
+              mapping,
+              todayRow: existingRowsByMaterialId.get(material.ticketMaterialId),
+              ticketType: ticketTypeByTicketId.get(material.ticketId) ?? null,
+            })
+          : buildMaterialUpsert({
+              statDate,
+              now,
+              syncLogId,
+              material,
+              mapping,
+              todayRow: existingRowsByMaterialId.get(material.ticketMaterialId),
+              previousRow: previousRowsByMaterialId.get(material.ticketMaterialId),
+              ticketType: ticketTypeByTicketId.get(material.ticketId) ?? null,
+            });
 
-        if (upsert.anomaly_code) {
+        if (!liveWindowSnapshot && upsert.anomaly_code) {
           anomalyCount += 1;
           rowsCorrected += 1;
         }
@@ -1695,73 +1786,95 @@ export async function runPhaseOneSync(
       }
 
       anomalyCount += missingMappingRows.length;
-      anomalyCount += outOfDateMappedRows.length;
+      if (!liveWindowSnapshot) {
+        anomalyCount += outOfDateMappedRows.length;
+      }
+
+      if (liveWindowSnapshot) {
+        for (const row of todayRows) {
+          if (!activeProductNos.includes(row.mechanic_item_no.trim())) {
+            continue;
+          }
+
+          if (seenMaterialIds.has(row.ticket_material_id)) {
+            continue;
+          }
+
+          upserts.push(buildLiveWindowZeroedUpsert(row, now, syncLogId));
+        }
+      }
 
       await logMissingMappingRows({
         syncLogId,
         statDate,
         rows: missingMappingRows,
       });
-      await logOutOfDateMaterialRows({
-        syncLogId,
-        statDate,
-        rows: outOfDateMappedRows,
-        mappings,
-      });
-      await logNegativeCorrectionRows({
-        syncLogId,
-        upserts,
-        mappings,
-      });
+      if (!liveWindowSnapshot) {
+        await logOutOfDateMaterialRows({
+          syncLogId,
+          statDate,
+          rows: outOfDateMappedRows,
+          mappings,
+        });
+        await logNegativeCorrectionRows({
+          syncLogId,
+          upserts,
+          mappings,
+        });
+      }
 
       await upsertBaselineRows(upserts, "Failed to upsert filtered mechanic baseline rows");
       rowsUpserted += upserts.length;
 
-      const mergedRows = mergeTodayRows(todayRows, upserts);
-      const mergedRowsByMaterialId = new Map(mergedRows.map((row) => [row.ticket_material_id, row]));
-      const validation = await validateKnownRows({
-        statDate,
-        now,
-        syncLogId,
-        rows: mergedRows,
-        mappings,
-        mappingByItemNo,
-        client,
-        prefetchedMaterialsByTicketId: updatedMaterialDiscovery.prefetchedMaterialsByTicketId,
-      });
+      if (!liveWindowSnapshot) {
+        const mergedRows = mergeTodayRows(todayRows, upserts);
+        const mergedRowsByMaterialId = new Map(mergedRows.map((row) => [row.ticket_material_id, row]));
+        const validation = await validateKnownRows({
+          statDate,
+          now,
+          syncLogId,
+          rows: mergedRows,
+          mappings,
+          mappingByItemNo,
+          client,
+          prefetchedMaterialsByTicketId: updatedMaterialDiscovery.prefetchedMaterialsByTicketId,
+        });
 
-      await upsertBaselineRows(validation.upserts, "Failed to upsert validated mechanic baseline rows");
+        await upsertBaselineRows(validation.upserts, "Failed to upsert validated mechanic baseline rows");
 
-      rowsUpserted += validation.upserts.length;
-      rowsCorrected += validation.rowsCorrected;
-      anomalyCount += validation.anomalyCount;
-      materialHttpCalls += validation.httpCalls;
-      validationTicketsChecked = validation.validationTicketsChecked;
-      unresolvedMissingMaterialIds.push(...validation.unresolvedMissingMaterialIds);
-      recoveredMaterialIds.push(...validation.recoveredMaterialIds);
+        rowsUpserted += validation.upserts.length;
+        rowsCorrected += validation.rowsCorrected;
+        anomalyCount += validation.anomalyCount;
+        materialHttpCalls += validation.httpCalls;
+        validationTicketsChecked = validation.validationTicketsChecked;
+        unresolvedMissingMaterialIds.push(...validation.unresolvedMissingMaterialIds);
+        recoveredMaterialIds.push(...validation.recoveredMaterialIds);
 
-      const newUnresolvedUpserts = validation.upserts.filter((row) => {
-        if (row.sync_state !== "unresolved_missing") {
-          return false;
-        }
+        const newUnresolvedUpserts = validation.upserts.filter((row) => {
+          if (row.sync_state !== "unresolved_missing") {
+            return false;
+          }
 
-        return mergedRowsByMaterialId.get(row.ticket_material_id)?.sync_state !== "unresolved_missing";
-      });
+          return mergedRowsByMaterialId.get(row.ticket_material_id)?.sync_state !== "unresolved_missing";
+        });
 
-      await logUnresolvedMissingRows({
-        syncLogId,
-        upserts: newUnresolvedUpserts,
-        mappings,
-      });
-      await logNegativeCorrectionRows({
-        syncLogId,
-        upserts: validation.upserts,
-        mappings,
-      });
-      await markRecoveredAnomalyLog(statDate, validation.recoveredMaterialIds);
+        await logUnresolvedMissingRows({
+          syncLogId,
+          upserts: newUnresolvedUpserts,
+          mappings,
+        });
+        await logNegativeCorrectionRows({
+          syncLogId,
+          upserts: validation.upserts,
+          mappings,
+        });
+        await markRecoveredAnomalyLog(statDate, validation.recoveredMaterialIds);
+      }
 
       await recalculateTotals(statDate);
-      await autoAcknowledgeMissingRows(statDate, now);
+      if (!liveWindowSnapshot) {
+        await autoAcknowledgeMissingRows(statDate, now);
+      }
       console.info("[sync] material phase complete", {
         syncLogId,
         materialsSeen,
