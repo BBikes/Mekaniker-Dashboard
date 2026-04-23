@@ -10,6 +10,7 @@ import { addDays, getCopenhagenDateString, toIsoTimestamp } from "@/lib/time";
 const SCHEDULED_SYNC_LOCK_MINUTES = 20;
 const SYNC_CURSOR_OVERLAP_MINUTES = 2;
 const DEFAULT_PAYMENT_BACKFILL_DAYS = 7;
+const DEFAULT_MANUAL_SYNC_LOOKBACK_HOURS = 48;
 const SUCCESSFUL_SYNC_STATUSES = ["completed", "completed_with_warning"] as const;
 
 type MechanicMapping = {
@@ -187,6 +188,10 @@ function rewindIsoTimestamp(timestamp: string, minutes: number) {
   return parsed.toISOString();
 }
 
+function hoursAgoIso(hours: number, from = new Date()) {
+  return new Date(from.getTime() - hours * 60 * 60 * 1000).toISOString();
+}
+
 function combineSyncMessages(current: string | null, next: string) {
   return current ? `${current}; ${next}` : next;
 }
@@ -247,11 +252,13 @@ async function discoverUpdatedMaterials({
   updatedAfter,
   activeProductNos,
   useUpdatedAfter,
+  allowFallbackSweep,
   client,
 }: {
   updatedAfter: string;
   activeProductNos: string[];
   useUpdatedAfter: boolean;
+  allowFallbackSweep: boolean;
   client: CustomersFirstClient;
 }): Promise<UpdatedMaterialDiscovery> {
   if (activeProductNos.length === 0) {
@@ -265,7 +272,9 @@ async function discoverUpdatedMaterials({
   }
 
   if (useUpdatedAfter) {
-    const filteredDiscovery = await client.listAllUpdatedTicketMaterialsForProductNos(updatedAfter, activeProductNos);
+    const filteredDiscovery = await client.listAllUpdatedTicketMaterialsForProductNos(updatedAfter, activeProductNos, {
+      allowFallbackSweep,
+    });
     return {
       normalizedItems: filteredDiscovery.normalizedItems,
       httpCalls: filteredDiscovery.httpCalls,
@@ -1462,16 +1471,41 @@ async function validateKnownRows({
 
 export async function runPhaseOneSync(
   mode: SyncMode,
-  options: { paymentBackfillDays?: number } = {},
+  options: {
+    materialLookbackHours?: number;
+    paymentBackfillDays?: number;
+    skipCykelPlusSync?: boolean;
+    skipPaymentSync?: boolean;
+    useFilteredProductDiscovery?: boolean;
+    strictProductDiscovery?: boolean;
+  } = {},
 ): Promise<SyncResult> {
   const syncLogId = await createSyncLog(mode);
 
   try {
     const statDate = getCopenhagenDateString();
     const now = toIsoTimestamp();
+    const materialLookbackHours =
+      typeof options.materialLookbackHours === "number" && Number.isFinite(options.materialLookbackHours)
+        ? Math.max(1, Math.trunc(options.materialLookbackHours))
+        : null;
     const paymentBackfillDays = Math.max(1, Math.trunc(options.paymentBackfillDays ?? DEFAULT_PAYMENT_BACKFILL_DAYS));
     const syncConfig = getServerConfig();
-    console.info("[sync] started", { mode, syncLogId, statDate, paymentBackfillDays });
+    const skipPaymentSync = options.skipPaymentSync === true;
+    const skipCykelPlusSync = options.skipCykelPlusSync === true;
+    const useFilteredProductDiscovery = options.useFilteredProductDiscovery === true || syncConfig.c1stUseUpdatedAfter;
+    const strictProductDiscovery = options.strictProductDiscovery === true;
+    console.info("[sync] started", {
+      mode,
+      syncLogId,
+      statDate,
+      paymentBackfillDays,
+      materialLookbackHours,
+      skipPaymentSync,
+      skipCykelPlusSync,
+      useFilteredProductDiscovery,
+      strictProductDiscovery,
+    });
 
     if (mode === "baseline") {
       const carryForwardRows = await loadCarryForwardRows(statDate);
@@ -1555,7 +1589,11 @@ export async function runPhaseOneSync(
       return result;
     }
 
-    const materialUpdatedAfter = mode === "sync" ? await getLastSuccessfulSyncTimestamp() : atStartOfDay(statDate);
+    const materialUpdatedAfter = mode === "sync"
+      ? materialLookbackHours !== null
+        ? hoursAgoIso(materialLookbackHours)
+        : await getLastSuccessfulSyncTimestamp()
+      : atStartOfDay(statDate);
     const paymentWindow = await resolvePaymentUpdatedAfter(mode, materialUpdatedAfter, paymentBackfillDays);
     const mappings = await fetchActiveMappings();
     const mappingByItemNo = new Map(mappings.map((mapping) => [mapping.mechanic_item_no.trim(), mapping]));
@@ -1588,7 +1626,7 @@ export async function runPhaseOneSync(
         mapping: MechanicMapping;
         materialStatDate: string | null;
       }> = [];
-      const discoveryStrategy = syncConfig.c1stUseUpdatedAfter ? "materials_by_product" : "tickets_then_materials";
+      const discoveryStrategy = useFilteredProductDiscovery ? "materials_by_product" : "tickets_then_materials";
       console.info("[sync] material discovery start", {
         syncLogId,
         strategy: discoveryStrategy,
@@ -1598,7 +1636,8 @@ export async function runPhaseOneSync(
       const updatedMaterialDiscovery = await discoverUpdatedMaterials({
         updatedAfter: materialUpdatedAfter,
         activeProductNos,
-        useUpdatedAfter: syncConfig.c1stUseUpdatedAfter,
+        useUpdatedAfter: useFilteredProductDiscovery,
+        allowFallbackSweep: !strictProductDiscovery,
         client,
       });
       materialDiscoveryHttpCalls = updatedMaterialDiscovery.httpCalls;
@@ -1733,7 +1772,7 @@ export async function runPhaseOneSync(
         validationTicketsChecked,
       });
 
-      if (!syncConfig.syncSkipPayments) {
+      if (!syncConfig.syncSkipPayments && !skipCykelPlusSync) {
         try {
           const cykelPlusCount = await client.getCykelPlusCustomerCount(syncConfig.cykelPlusTag);
           await createAdminClient().from("cykelplus_snapshots").upsert(
@@ -1752,9 +1791,9 @@ export async function runPhaseOneSync(
       mode,
       paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
       paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
-      syncSkipPayments: syncConfig.syncSkipPayments,
+      syncSkipPayments: syncConfig.syncSkipPayments || skipPaymentSync,
     });
-    if (syncConfig.syncSkipPayments && mode !== "payments_backfill") {
+    if ((syncConfig.syncSkipPayments || skipPaymentSync) && mode !== "payments_backfill") {
       payment = {
         httpCalls: 0,
         paymentsSeen: 0,

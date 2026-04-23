@@ -8,6 +8,8 @@ type ActionState = {
   error: boolean;
 } | null;
 
+const MANUAL_ACTION_TIMEOUT_MS = 60_000;
+
 function toUiErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
 
@@ -27,24 +29,42 @@ function toUiErrorMessage(error: unknown) {
     return "Du er ikke logget ind længere. Genindlæs siden og log ind igen.";
   }
 
+  if (message.includes("Manual action timed out")) {
+    return "Sync-svaret kom ikke tilbage i tide. Prøv igen om et øjeblik.";
+  }
+
   return message || "Ukendt fejl";
 }
 
 async function request(url: string, options?: RequestInit) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MANUAL_ACTION_TIMEOUT_MS);
 
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error ?? "Kaldet fejlede");
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Kaldet fejlede");
+    }
+
+    return payload;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Manual action timed out");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return payload;
 }
 
 export function InternalActions({
@@ -126,14 +146,14 @@ export function InternalActions({
           className="button button--accent"
           disabled={buttonsDisabled}
           onClick={() =>
-            run("Kør sync nu", "/api/sync/manual", {
+            run("Kør 48 timers sync", "/api/sync/manual", {
               method: "POST",
-              body: JSON.stringify({ mode: "sync" }),
+              body: JSON.stringify({ mode: "sync", lookbackHours: 48 }),
             })
           }
           type="button"
         >
-          {pendingLabel === "Kør sync nu" ? "Kører..." : "Kør sync nu"}
+          {pendingLabel === "Kør 48 timers sync" ? "Kører..." : "Kør 48 timers sync"}
         </button>
       </div>
       <div className={`response-box ${state?.error ? "response-box--error" : ""}`}>

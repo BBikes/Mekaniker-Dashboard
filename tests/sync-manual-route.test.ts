@@ -47,6 +47,29 @@ afterEach(() => {
 });
 
 describe("POST /api/sync/manual", () => {
+  it("uses a strict 48 hour filtered sync by default", async () => {
+    const runPhaseOneSync = vi.fn(async () => buildSyncResult("sync"));
+    const { route } = await loadRoute(runPhaseOneSync);
+
+    const response = await route.POST(
+      new Request("http://localhost/api/sync/manual", {
+        method: "POST",
+        body: JSON.stringify({ mode: "sync" }),
+        headers: { "content-type": "application/json" },
+      }) as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(runPhaseOneSync).toHaveBeenCalledWith("sync", {
+      materialLookbackHours: 48,
+      paymentBackfillDays: undefined,
+      skipCykelPlusSync: true,
+      skipPaymentSync: true,
+      useFilteredProductDiscovery: true,
+      strictProductDiscovery: true,
+    });
+  });
+
   it("uses payments_backfill with the default 7 day window", async () => {
     const runPhaseOneSync = vi.fn(async () => buildSyncResult("payments_backfill"));
     const { route } = await loadRoute(runPhaseOneSync);

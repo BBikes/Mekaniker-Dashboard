@@ -425,7 +425,11 @@ describe("runPhaseOneSync", () => {
     const { runPhaseOneSync } = await loadSyncModule(state, client);
     const result = await runPhaseOneSync("sync");
 
-    expect(client.listAllUpdatedTicketMaterialsForProductNos).toHaveBeenCalledWith("2026-04-14T10:13:00.000Z", ["MEK-ALICE"]);
+    expect(client.listAllUpdatedTicketMaterialsForProductNos).toHaveBeenCalledWith(
+      "2026-04-14T10:13:00.000Z",
+      ["MEK-ALICE"],
+      { allowFallbackSweep: true },
+    );
     expect(client.listAllUpdatedTickets).not.toHaveBeenCalled();
     expect(client.listAllTicketMaterialsForTicket).toHaveBeenCalledWith(500);
     expect(result.httpCalls).toBe(2);

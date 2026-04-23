@@ -127,6 +127,55 @@ describe("CustomersFirstClient", () => {
     expect(secondUrl).toContain("tags=18426");
   });
 
+  it("includes updated_after on ticket material requests even when filtered discovery fallback is enabled", async () => {
+    fetchMock.mockResolvedValueOnce(
+      createJsonResponse({
+        content: [],
+        total: 0,
+      }),
+    );
+
+    const client = new CustomersFirstClient();
+    await client.listTicketMaterialsPage({ updatedAfter: "2026-04-21T10:00:00.000Z", productNo: "2403B15" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(requestUrl).toContain("/tickets/materials?");
+    expect(requestUrl).toContain("updated_after=2026-04-21T10%3A00%3A00.000Z");
+    expect(requestUrl).toContain("productno=2403B15");
+  });
+
+  it("skips the broad fallback sweep when strict product filtering is requested", async () => {
+    fetchMock.mockResolvedValueOnce(
+      createJsonResponse({
+        content: [
+          {
+            id: 1,
+            taskid: 101,
+            productno: "NOT-MATCHING",
+            amount: 1,
+            updated_at: "2026-04-22 12:00:00",
+          },
+        ],
+        total: 1,
+      }),
+    );
+
+    const client = new CustomersFirstClient();
+    const result = await client.listAllUpdatedTicketMaterialsForProductNos(
+      "2026-04-21T10:00:00.000Z",
+      ["2403B15"],
+      { allowFallbackSweep: false },
+    );
+
+    expect(result).toEqual({
+      normalizedItems: [],
+      httpCalls: 1,
+      skippedProductNos: ["2403B15"],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it(
     "fails with a timeout error when Customers 1st stops responding",
     async () => {

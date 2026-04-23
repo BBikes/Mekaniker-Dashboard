@@ -373,7 +373,7 @@ export class CustomersFirstClient {
       params.set("ticketid", String(options.ticketId));
     }
 
-    if (options.updatedAfter && this.config.c1stUseUpdatedAfter) {
+    if (options.updatedAfter) {
       params.set(this.config.c1stUpdatedAfterParam, options.updatedAfter);
     }
 
@@ -486,12 +486,12 @@ export class CustomersFirstClient {
   async listAllUpdatedTicketMaterialsForProductNos(
     updatedAfter: string,
     productNos: string[],
+    options: {
+      allowFallbackSweep?: boolean;
+    } = {},
   ): Promise<{ normalizedItems: NormalizedTicketMaterial[]; httpCalls: number; skippedProductNos: string[] }> {
-    if (!this.config.c1stUseUpdatedAfter) {
-      throw new Error("Filtered Customers 1st material sync requires C1ST_USE_UPDATED_AFTER=true.");
-    }
-
     const normalizedProductNos = [...new Set(productNos.map((value) => value.trim()).filter(Boolean))];
+    const allowFallbackSweep = options.allowFallbackSweep !== false;
     const seenMaterialIds = new Set<number>();
     const normalizedItems: NormalizedTicketMaterial[] = [];
     const skippedProductNos: string[] = [];
@@ -545,7 +545,7 @@ export class CustomersFirstClient {
     // Fallback for skipped product numbers: C1st ignored the productNo filter, so do one
     // unfiltered sweep and collect matching materials client-side. This ensures new tickets
     // (not yet in daily_ticket_item_baselines) are still discovered for skipped mechanics.
-    if (skippedProductNos.length > 0) {
+    if (allowFallbackSweep && skippedProductNos.length > 0) {
       const skippedSet = new Set(skippedProductNos);
       let fallbackStart = 0;
       let fallbackCounter = 0;
