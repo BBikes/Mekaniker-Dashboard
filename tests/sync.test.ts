@@ -233,7 +233,15 @@ function createMockClient(overrides: Partial<MockCustomersFirstClient> = {}): Mo
   };
 }
 
-async function loadSyncModule(state: DbState, client: MockCustomersFirstClient) {
+async function loadSyncModule(
+  state: DbState,
+  client: MockCustomersFirstClient,
+  envOverrides: Partial<{
+    c1stUseUpdatedAfter: boolean;
+    syncSkipPayments: boolean;
+    cykelPlusTag: string;
+  }> = {},
+) {
   vi.resetModules();
   vi.doMock("server-only", () => ({}));
   vi.doMock("@/lib/supabase/server", () => ({
@@ -244,7 +252,10 @@ async function loadSyncModule(state: DbState, client: MockCustomersFirstClient) 
   }));
   vi.doMock("@/lib/env", () => ({
     getServerConfig: () => ({
+      c1stUseUpdatedAfter: true,
+      syncSkipPayments: false,
       cykelPlusTag: "CykelPlus",
+      ...envOverrides,
     }),
   }));
   vi.doMock("@/lib/targets", () => ({
@@ -449,24 +460,52 @@ describe("runPhaseOneSync", () => {
     );
   });
 
-  it("fails clearly when filtered material sync cannot run", async () => {
-    const state = createStateWithRows();
+  it("falls back to ticket-scoped discovery when filtered material sync is disabled", async () => {
+    const state = createStateWithRows([createBaselineRow()]);
+    const material = createMaterial({
+      amount: 8,
+      totalInclVat: 400,
+      updatedAt: "2026-04-14T10:16:00.000Z",
+    });
     const client = createMockClient({
-      listAllUpdatedTicketMaterialsForProductNos: vi.fn(async () => {
-        throw new Error("Filtered Customers 1st material sync requires C1ST_USE_UPDATED_AFTER=true.");
-      }),
+      listAllUpdatedTickets: vi.fn(async () => ({
+        normalizedItems: [
+          {
+            ticketId: 500,
+            ticketType: "repair",
+            updatedAt: "2026-04-14T10:16:00.000Z",
+            createdAt: "2026-04-14T09:00:00.000Z",
+            raw: {},
+          },
+        ],
+        httpCalls: 1,
+      })),
+      listAllTicketMaterialsForTicket: createTicketMaterialFetcher([material]),
     });
 
-    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const { runPhaseOneSync } = await loadSyncModule(state, client, { c1stUseUpdatedAfter: false });
+    const result = await runPhaseOneSync("sync");
 
-    await expect(runPhaseOneSync("sync")).rejects.toThrow("Filtered Customers 1st material sync requires");
-    expect(client.listAllUpdatedTickets).not.toHaveBeenCalled();
-    expect(client.listAllUpdatedTicketMaterials).not.toHaveBeenCalled();
+    expect(client.listAllUpdatedTicketMaterialsForProductNos).not.toHaveBeenCalled();
+    expect(client.listAllUpdatedTickets).toHaveBeenCalledWith("2026-04-14T10:13:00.000Z");
+    expect(client.listAllTicketMaterialsForTicket).toHaveBeenCalledWith(500);
     expect(state.sync_event_log).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          status: "failed",
-          message: expect.stringContaining("Filtered Customers 1st material sync requires"),
+          id: result.syncLogId,
+          status: "completed",
+        }),
+      ]),
+    );
+    expect(state.daily_ticket_item_baselines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 11,
+          current_quantity: 8,
+          today_added_quantity: 4,
+          today_added_hours: 1,
+          ticket_type: "repair",
+          source_sync_event_id: result.syncLogId,
         }),
       ]),
     );

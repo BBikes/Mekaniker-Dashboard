@@ -38,6 +38,7 @@ type PaginatedResult<T> = {
 export type TicketsPage = PaginatedResult<NormalizedTicket>;
 export type TicketMaterialsPage = PaginatedResult<NormalizedTicketMaterial>;
 const MAX_RETRY_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 20_000;
 
 function parseExtraQuery(rawValue: string): URLSearchParams {
   const params = new URLSearchParams();
@@ -164,8 +165,82 @@ function readRetryDelayMs(response: Response, attempt: number) {
   return attempt * 1000;
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function isRetryableRequestError(error: unknown) {
+  return isAbortError(error) || error instanceof TypeError;
+}
+
 export class CustomersFirstClient {
   private readonly config = getServerConfig();
+
+  private async fetchWithRetries({
+    url,
+    errorLabel,
+    returnNullOn404 = false,
+  }: {
+    url: URL;
+    errorLabel: string;
+    returnNullOn404?: boolean;
+  }) {
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${this.config.c1stApiToken}`,
+            Accept: "application/json",
+          },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          return response;
+        }
+
+        if (returnNullOn404 && response.status === 404) {
+          return null;
+        }
+
+        if (response.status === 429 && attempt < MAX_RETRY_ATTEMPTS) {
+          await sleep(readRetryDelayMs(response, attempt));
+          continue;
+        }
+
+        throw new Error(`${errorLabel} failed with ${response.status} ${response.statusText}`);
+      } catch (error) {
+        clearTimeout(timeout);
+
+        if (isAbortError(error)) {
+          if (attempt === MAX_RETRY_ATTEMPTS) {
+            throw new Error(`${errorLabel} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+          }
+
+          await sleep(attempt * 1000);
+          continue;
+        }
+
+        if (!isRetryableRequestError(error) || attempt === MAX_RETRY_ATTEMPTS) {
+          if (error instanceof Error && error.message.startsWith(`${errorLabel} failed with`)) {
+            throw error;
+          }
+
+          throw new Error(`${errorLabel} request error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+        await sleep(attempt * 1000);
+      }
+    }
+
+    throw new Error(`${errorLabel} failed without a valid response.`);
+  }
 
   private async requestJson({
     path,
@@ -182,32 +257,17 @@ export class CustomersFirstClient {
       url.search = params.toString();
     }
 
-    let response: Response | null = null;
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.config.c1stApiToken}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
+    const response = await this.fetchWithRetries({
+      url,
+      errorLabel: `Customers 1st request to ${path}`,
+      returnNullOn404,
+    });
 
-      if (response.ok) {
-        break;
-      }
-
-      if (returnNullOn404 && response.status === 404) {
-        return null;
-      }
-
-      if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
-        throw new Error(`Customers 1st request failed with ${response.status} ${response.statusText}`);
-      }
-
-      await sleep(readRetryDelayMs(response, attempt));
+    if (!response) {
+      return null;
     }
 
-    if (!response || !response.ok) {
+    if (!response.ok) {
       throw new Error("Customers 1st request failed without a valid response.");
     }
 
@@ -350,26 +410,10 @@ export class CustomersFirstClient {
       const url = new URL(`${baseUrl}/pospayments`);
       url.search = params.toString();
 
-      let response: Response | null = null;
-      for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-        response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${this.config.c1stApiToken}`,
-            Accept: "application/json",
-          },
-          cache: "no-store",
-        });
-
-        if (response.ok) {
-          break;
-        }
-
-        if (response.status !== 429 || attempt === MAX_RETRY_ATTEMPTS) {
-          throw new Error(`Customers 1st /pospayments request failed with ${response.status} ${response.statusText}`);
-        }
-
-        await sleep(readRetryDelayMs(response, attempt));
-      }
+      const response = await this.fetchWithRetries({
+        url,
+        errorLabel: "Customers 1st /pospayments request",
+      });
 
       if (!response || !response.ok) {
         throw new Error("Customers 1st /pospayments request failed without a valid response.");

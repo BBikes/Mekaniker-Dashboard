@@ -235,6 +235,81 @@ async function fetchTicketScopedMaterials(ticketIds: number[], client = new Cust
   };
 }
 
+type UpdatedMaterialDiscovery = {
+  normalizedItems: NormalizedTicketMaterial[];
+  httpCalls: number;
+  skippedProductNos: string[];
+  ticketTypeByTicketId: Map<number, string>;
+  prefetchedMaterialsByTicketId: Map<number, NormalizedTicketMaterial[]>;
+};
+
+async function discoverUpdatedMaterials({
+  updatedAfter,
+  activeProductNos,
+  useUpdatedAfter,
+  client,
+}: {
+  updatedAfter: string;
+  activeProductNos: string[];
+  useUpdatedAfter: boolean;
+  client: CustomersFirstClient;
+}): Promise<UpdatedMaterialDiscovery> {
+  if (activeProductNos.length === 0) {
+    return {
+      normalizedItems: [],
+      httpCalls: 0,
+      skippedProductNos: [],
+      ticketTypeByTicketId: new Map<number, string>(),
+      prefetchedMaterialsByTicketId: new Map<number, NormalizedTicketMaterial[]>(),
+    };
+  }
+
+  if (useUpdatedAfter) {
+    const filteredDiscovery = await client.listAllUpdatedTicketMaterialsForProductNos(updatedAfter, activeProductNos);
+    return {
+      normalizedItems: filteredDiscovery.normalizedItems,
+      httpCalls: filteredDiscovery.httpCalls,
+      skippedProductNos: filteredDiscovery.skippedProductNos ?? [],
+      ticketTypeByTicketId: new Map<number, string>(),
+      prefetchedMaterialsByTicketId: new Map<number, NormalizedTicketMaterial[]>(),
+    };
+  }
+
+  const updatedTickets = await client.listAllUpdatedTickets(updatedAfter);
+  const ticketTypeByTicketId = new Map<number, string>();
+  for (const ticket of updatedTickets.normalizedItems) {
+    if (ticket.ticketType) {
+      ticketTypeByTicketId.set(ticket.ticketId, ticket.ticketType);
+    }
+  }
+
+  const prefetchedMaterials = await fetchTicketScopedMaterials(
+    updatedTickets.normalizedItems.map((ticket) => ticket.ticketId),
+    client,
+  );
+  const activeProductNoSet = new Set(activeProductNos);
+  const normalizedItems: NormalizedTicketMaterial[] = [];
+
+  for (const materials of prefetchedMaterials.materialsByTicketId.values()) {
+    for (const material of materials) {
+      const productNo = getProductNo(material);
+      if (!productNo || !activeProductNoSet.has(productNo)) {
+        continue;
+      }
+
+      normalizedItems.push(material);
+    }
+  }
+
+  return {
+    normalizedItems,
+    httpCalls: updatedTickets.httpCalls + prefetchedMaterials.httpCalls,
+    skippedProductNos: [],
+    ticketTypeByTicketId,
+    prefetchedMaterialsByTicketId: prefetchedMaterials.materialsByTicketId,
+  };
+}
+
 async function fetchActiveMappings() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -1395,6 +1470,8 @@ export async function runPhaseOneSync(
     const statDate = getCopenhagenDateString();
     const now = toIsoTimestamp();
     const paymentBackfillDays = Math.max(1, Math.trunc(options.paymentBackfillDays ?? DEFAULT_PAYMENT_BACKFILL_DAYS));
+    const syncConfig = getServerConfig();
+    console.info("[sync] started", { mode, syncLogId, statDate, paymentBackfillDays });
 
     if (mode === "baseline") {
       const carryForwardRows = await loadCarryForwardRows(statDate);
@@ -1511,12 +1588,25 @@ export async function runPhaseOneSync(
         mapping: MechanicMapping;
         materialStatDate: string | null;
       }> = [];
-      const updatedMaterialDiscovery = activeProductNos.length > 0
-        ? await client.listAllUpdatedTicketMaterialsForProductNos(materialUpdatedAfter, activeProductNos)
-        : { normalizedItems: [] as NormalizedTicketMaterial[], httpCalls: 0, skippedProductNos: [] as string[] };
+      const discoveryStrategy = syncConfig.c1stUseUpdatedAfter ? "materials_by_product" : "tickets_then_materials";
+      console.info("[sync] material discovery start", {
+        syncLogId,
+        strategy: discoveryStrategy,
+        updatedAfter: materialUpdatedAfter,
+        activeProductCount: activeProductNos.length,
+      });
+      const updatedMaterialDiscovery = await discoverUpdatedMaterials({
+        updatedAfter: materialUpdatedAfter,
+        activeProductNos,
+        useUpdatedAfter: syncConfig.c1stUseUpdatedAfter,
+        client,
+      });
       materialDiscoveryHttpCalls = updatedMaterialDiscovery.httpCalls;
       materialsSeen += updatedMaterialDiscovery.normalizedItems.length;
       skippedProductNos = updatedMaterialDiscovery.skippedProductNos ?? [];
+      for (const [ticketId, ticketType] of updatedMaterialDiscovery.ticketTypeByTicketId.entries()) {
+        ticketTypeByTicketId.set(ticketId, ticketType);
+      }
       const previousRowsByMaterialId = await loadPreviousRowsByMaterialId(
         statDate,
         [...new Set(updatedMaterialDiscovery.normalizedItems.map((material) => material.ticketMaterialId))],
@@ -1598,6 +1688,7 @@ export async function runPhaseOneSync(
         mappings,
         mappingByItemNo,
         client,
+        prefetchedMaterialsByTicketId: updatedMaterialDiscovery.prefetchedMaterialsByTicketId,
       });
 
       await upsertBaselineRows(validation.upserts, "Failed to upsert validated mechanic baseline rows");
@@ -1632,11 +1723,19 @@ export async function runPhaseOneSync(
 
       await recalculateTotals(statDate);
       await autoAcknowledgeMissingRows(statDate, now);
+      console.info("[sync] material phase complete", {
+        syncLogId,
+        materialsSeen,
+        mappedMaterialsSeen,
+        rowsUpserted,
+        rowsCorrected,
+        anomalyCount,
+        validationTicketsChecked,
+      });
 
-      const cykelPlusConfig = getServerConfig();
-      if (!cykelPlusConfig.syncSkipPayments) {
+      if (!syncConfig.syncSkipPayments) {
         try {
-          const cykelPlusCount = await client.getCykelPlusCustomerCount(cykelPlusConfig.cykelPlusTag);
+          const cykelPlusCount = await client.getCykelPlusCustomerCount(syncConfig.cykelPlusTag);
           await createAdminClient().from("cykelplus_snapshots").upsert(
             { snapshot_date: statDate, customer_count: cykelPlusCount, updated_at: now },
             { onConflict: "snapshot_date" },
@@ -1647,9 +1746,15 @@ export async function runPhaseOneSync(
       }
     }
 
-    const paymentConfig = getServerConfig();
     let payment: PaymentSyncMetrics;
-    if (paymentConfig.syncSkipPayments && mode !== "payments_backfill") {
+    console.info("[sync] payment phase start", {
+      syncLogId,
+      mode,
+      paymentUpdatedAfter: paymentWindow.paymentUpdatedAfter,
+      paymentBackfillWindowDays: paymentWindow.paymentBackfillWindowDays,
+      syncSkipPayments: syncConfig.syncSkipPayments,
+    });
+    if (syncConfig.syncSkipPayments && mode !== "payments_backfill") {
       payment = {
         httpCalls: 0,
         paymentsSeen: 0,
@@ -1754,8 +1859,24 @@ export async function runPhaseOneSync(
       },
     });
 
+    console.info("[sync] completed", {
+      syncLogId,
+      mode,
+      status: hasWarning ? "completed_with_warning" : "completed",
+      httpCalls: result.httpCalls,
+      rowsUpserted: result.rowsUpserted,
+      rowsCorrected: result.rowsCorrected,
+      anomalyCount: result.anomalyCount,
+      paymentError: result.payment?.paymentError ?? null,
+    });
+
     return result;
   } catch (error) {
+    console.error("[sync] failed", {
+      syncLogId,
+      mode,
+      error: error instanceof Error ? error.message : String(error),
+    });
     await completeSyncLog(syncLogId, {
       status: "failed",
       message: error instanceof Error ? error.message : "Unknown sync failure",

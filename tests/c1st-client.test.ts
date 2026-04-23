@@ -12,8 +12,10 @@ vi.mock("@/lib/env", () => ({
     c1stDefaultPageLength: 2,
     c1stUseUpdatedAfter: false,
     c1stUpdatedAfterParam: "updated_after",
+    c1stTicketMaterialProductNoParam: "productno",
     c1stExtraTicketMaterialQuery: "",
     cykelPlusTag: "CykelPlus",
+    syncSkipPayments: false,
   }),
 }));
 
@@ -124,4 +126,41 @@ describe("CustomersFirstClient", () => {
     expect(secondUrl).toContain("/customers?");
     expect(secondUrl).toContain("tags=18426");
   });
+
+  it(
+    "fails with a timeout error when Customers 1st stops responding",
+    async () => {
+      vi.useFakeTimers();
+      try {
+        fetchMock.mockImplementation(
+          (_input, init) =>
+            new Promise((_resolve, reject) => {
+              const signal = init?.signal;
+              signal?.addEventListener("abort", () => {
+                reject(Object.assign(new Error("The operation was aborted."), { name: "AbortError" }));
+              });
+            }),
+        );
+
+        const client = new CustomersFirstClient();
+        let caughtError: unknown = null;
+        const request = client.getTicketById(8550526).catch((error) => {
+          caughtError = error;
+          return null;
+        });
+
+        await vi.advanceTimersByTimeAsync(70_000);
+
+        await request;
+
+        expect(caughtError).toBeInstanceOf(Error);
+        expect((caughtError as Error).message).toContain(
+          "Customers 1st request to /tickets/8550526 timed out after 20000ms",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+    10000,
+  );
 });
