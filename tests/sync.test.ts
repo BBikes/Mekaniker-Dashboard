@@ -310,6 +310,9 @@ function createBaselineRow(overrides: TableRow = {}): TableRow {
     source_payment_id: null,
     source_amountpaid: null,
     source_updated_at: "2026-04-14T10:00:00.000Z",
+    source_stat_date: "2026-04-14",
+    source_decision_reason: "included_matching_source_date",
+    source_sync_event_id: "previous-sync",
     ticket_material_id: 11,
     ticket_type: "repair",
     line_total_incl_vat: 200,
@@ -424,6 +427,9 @@ describe("runPhaseOneSync", () => {
           current_quantity: 8,
           today_added_quantity: 4,
           today_added_hours: 1,
+          source_stat_date: "2026-04-14",
+          source_decision_reason: "included_matching_source_date",
+          source_sync_event_id: result.syncLogId,
           ticket_type: "repair",
         }),
       ]),
@@ -491,6 +497,9 @@ describe("runPhaseOneSync", () => {
           current_quantity: 8,
           today_added_quantity: 4,
           today_added_hours: 1,
+          source_stat_date: "2026-04-14",
+          source_decision_reason: "retained_missing_in_latest_fetch",
+          source_sync_event_id: result.syncLogId,
           sync_state: "unresolved_missing",
           anomaly_code: "missing_in_latest_fetch",
           missing_since: "2026-04-14T10:20:00.000Z",
@@ -512,6 +521,15 @@ describe("runPhaseOneSync", () => {
           id: result.syncLogId,
           status: "completed_with_warning",
           message: "sync completed with sync warning",
+        }),
+      ]),
+    );
+    expect(state.sync_anomaly_log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 11,
+          category: "missing_lifecycle",
+          resolution: "confirmed_missing",
         }),
       ]),
     );
@@ -538,6 +556,7 @@ describe("runPhaseOneSync", () => {
           ticket_material_id: 11,
           mechanic_item_no: "MEK-ALICE",
           mechanic_name: "Alice",
+          category: "missing_lifecycle",
           previous_current_qty: 8,
           previous_today_added: 4,
           resolution: "confirmed_missing",
@@ -560,6 +579,9 @@ describe("runPhaseOneSync", () => {
           current_quantity: 9,
           today_added_quantity: 5,
           today_added_hours: 1.25,
+          source_stat_date: "2026-04-14",
+          source_decision_reason: "included_matching_source_date",
+          source_sync_event_id: result.syncLogId,
           sync_state: "recovered",
           anomaly_code: null,
           missing_since: null,
@@ -579,6 +601,7 @@ describe("runPhaseOneSync", () => {
       expect.arrayContaining([
         expect.objectContaining({
           ticket_material_id: 11,
+          category: "missing_lifecycle",
           resolution: "auto_recovered",
           notes: "Recovered by stable mechanic-line validation.",
         }),
@@ -586,7 +609,7 @@ describe("runPhaseOneSync", () => {
     );
   });
 
-  it("handles downward adjustments without negative day totals", async () => {
+  it("allows negative same-day corrections in daily totals", async () => {
     const materialAboveBaseline = createMaterial({ ticketMaterialId: 11, ticketId: 500, amount: 6 });
     const materialBelowBaseline = createMaterial({ ticketMaterialId: 12, ticketId: 501, amount: 3 });
     const state = createStateWithRows([
@@ -614,7 +637,7 @@ describe("runPhaseOneSync", () => {
     });
 
     const { runPhaseOneSync } = await loadSyncModule(state, client);
-    await runPhaseOneSync("sync");
+    const result = await runPhaseOneSync("sync");
 
     expect(state.daily_ticket_item_baselines).toEqual(
       expect.arrayContaining([
@@ -623,14 +646,16 @@ describe("runPhaseOneSync", () => {
           current_quantity: 6,
           today_added_quantity: 2,
           today_added_hours: 0.5,
+          source_sync_event_id: result.syncLogId,
           sync_state: "ok",
           anomaly_code: null,
         }),
         expect.objectContaining({
           ticket_material_id: 12,
           current_quantity: 3,
-          today_added_quantity: 0,
-          today_added_hours: 0,
+          today_added_quantity: -2,
+          today_added_hours: -0.5,
+          source_sync_event_id: result.syncLogId,
           sync_state: "adjusted",
           anomaly_code: "below_baseline_correction",
         }),
@@ -640,10 +665,175 @@ describe("runPhaseOneSync", () => {
       expect.arrayContaining([
         expect.objectContaining({
           mechanic_id: "m-1",
-          quarters_total: 2,
-          hours_total: 0.5,
+          quarters_total: 0,
+          hours_total: 0,
         }),
       ]),
+    );
+    expect(state.sync_anomaly_log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 12,
+          category: "same_day_negative_correction",
+          resolution: "confirmed_missing",
+        }),
+      ]),
+    );
+    await runPhaseOneSync("sync");
+    expect(state.sync_anomaly_log.filter((row) => row.ticket_material_id === 12 && row.category === "same_day_negative_correction")).toHaveLength(1);
+  });
+
+  it("skips mapped materials where material date is not today and logs an audit anomaly", async () => {
+    const state = createStateWithRows();
+    const client = createMockClient({
+      listAllUpdatedTicketMaterialsForProductNos: vi.fn(async () => ({
+        normalizedItems: [
+          createMaterial({
+            ticketMaterialId: 42,
+            ticketId: 900,
+            amount: 8,
+            sourceDate: "2026-04-13",
+            updatedAt: "2026-04-14T10:16:00.000Z",
+          }),
+        ],
+        httpCalls: 1,
+      })),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const result = await runPhaseOneSync("sync");
+
+    expect(result.details.visibilityAnomalies).toEqual([42]);
+    expect(state.daily_ticket_item_baselines).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 42,
+        }),
+      ]),
+    );
+    expect(state.sync_anomaly_log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 42,
+          ticket_id: 900,
+          mechanic_item_no: "MEK-ALICE",
+          category: "material_date_mismatch",
+          resolution: "confirmed_missing",
+          notes: expect.stringContaining("does not match 2026-04-14"),
+        }),
+      ]),
+    );
+    await runPhaseOneSync("sync");
+    expect(state.sync_anomaly_log.filter((row) => row.ticket_material_id === 42 && row.category === "material_date_mismatch")).toHaveLength(1);
+  });
+
+  it("logs missing mappings once per day and keeps reruns idempotent", async () => {
+    const state = createStateWithRows();
+    const client = createMockClient({
+      listAllUpdatedTicketMaterialsForProductNos: vi.fn(async () => ({
+        normalizedItems: [
+          createMaterial({
+            ticketMaterialId: 501,
+            ticketId: 901,
+            productNo: "MEK-UNKNOWN",
+            amount: 6,
+          }),
+        ],
+        httpCalls: 1,
+      })),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const first = await runPhaseOneSync("sync");
+    const second = await runPhaseOneSync("sync");
+
+    expect(first.details.unmappedProductNos).toEqual(["MEK-UNKNOWN"]);
+    expect(second.details.unmappedProductNos).toEqual(["MEK-UNKNOWN"]);
+    expect(state.daily_ticket_item_baselines).toHaveLength(0);
+    expect(state.sync_anomaly_log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ticket_material_id: 501,
+          mechanic_item_no: "MEK-UNKNOWN",
+          category: "missing_mapping",
+          resolution: "confirmed_missing",
+        }),
+      ]),
+    );
+    expect(state.sync_anomaly_log.filter((row) => row.ticket_material_id === 501 && row.category === "missing_mapping")).toHaveLength(1);
+  });
+
+  it("keeps baseline rows and totals idempotent across identical sync reruns", async () => {
+    const state = createStateWithRows([
+      createBaselineRow({
+        baseline_quantity: 4,
+        current_quantity: 4,
+        today_added_quantity: 0,
+        today_added_hours: 0,
+      }),
+    ]);
+    const material = createMaterial({ amount: 8, totalInclVat: 400 });
+    const client = createMockClient({
+      listAllUpdatedTicketMaterialsForProductNos: vi.fn(async () => ({ normalizedItems: [material], httpCalls: 1 })),
+      listAllTicketMaterialsForTicket: createTicketMaterialFetcher([material]),
+    });
+
+    const { runPhaseOneSync } = await loadSyncModule(state, client);
+    const first = await runPhaseOneSync("sync");
+    const baselineAfterFirst = state.daily_ticket_item_baselines.map((row) => ({
+      stat_date: row.stat_date,
+      ticket_material_id: row.ticket_material_id,
+      baseline_quantity: row.baseline_quantity,
+      current_quantity: row.current_quantity,
+      today_added_quantity: row.today_added_quantity,
+      today_added_hours: row.today_added_hours,
+      source_stat_date: row.source_stat_date,
+      source_decision_reason: row.source_decision_reason,
+      anomaly_code: row.anomaly_code,
+      sync_state: row.sync_state,
+    }));
+    const totalsAfterFirst = state.daily_mechanic_totals.map((row) => ({
+      stat_date: row.stat_date,
+      mechanic_id: row.mechanic_id,
+      quarters_total: row.quarters_total,
+      hours_total: row.hours_total,
+      target_hours: row.target_hours,
+      variance_hours: row.variance_hours,
+    }));
+
+    const second = await runPhaseOneSync("sync");
+    const baselineAfterSecond = state.daily_ticket_item_baselines.map((row) => ({
+      stat_date: row.stat_date,
+      ticket_material_id: row.ticket_material_id,
+      baseline_quantity: row.baseline_quantity,
+      current_quantity: row.current_quantity,
+      today_added_quantity: row.today_added_quantity,
+      today_added_hours: row.today_added_hours,
+      source_stat_date: row.source_stat_date,
+      source_decision_reason: row.source_decision_reason,
+      anomaly_code: row.anomaly_code,
+      sync_state: row.sync_state,
+    }));
+    const totalsAfterSecond = state.daily_mechanic_totals.map((row) => ({
+      stat_date: row.stat_date,
+      mechanic_id: row.mechanic_id,
+      quarters_total: row.quarters_total,
+      hours_total: row.hours_total,
+      target_hours: row.target_hours,
+      variance_hours: row.variance_hours,
+    }));
+
+    expect(first.details.unresolvedMissingMaterialIds).toEqual([]);
+    expect(second.details.unresolvedMissingMaterialIds).toEqual([]);
+    expect(state.daily_ticket_item_baselines).toHaveLength(1);
+    expect(state.daily_mechanic_totals).toHaveLength(1);
+    expect(state.sync_anomaly_log).toHaveLength(0);
+    expect(baselineAfterSecond).toEqual(baselineAfterFirst);
+    expect(totalsAfterSecond).toEqual(totalsAfterFirst);
+    expect(state.daily_ticket_item_baselines[0]).toEqual(
+      expect.objectContaining({
+        source_sync_event_id: second.syncLogId,
+      }),
     );
   });
 
@@ -665,7 +855,7 @@ describe("runPhaseOneSync", () => {
     });
 
     const { runPhaseOneSync } = await loadSyncModule(state, client);
-    await runPhaseOneSync("sync");
+    const result = await runPhaseOneSync("sync");
 
     expect(state.daily_ticket_item_baselines).toEqual(
       expect.arrayContaining([
@@ -673,6 +863,8 @@ describe("runPhaseOneSync", () => {
           ticket_material_id: 11,
           today_added_quantity: 0,
           today_added_hours: 0,
+          source_decision_reason: "replaced_by_new_material",
+          source_sync_event_id: result.syncLogId,
           sync_state: "replaced",
           anomaly_code: "replaced_by_new_material",
         }),
@@ -682,6 +874,8 @@ describe("runPhaseOneSync", () => {
           current_quantity: 4,
           today_added_quantity: 4,
           today_added_hours: 1,
+          source_decision_reason: "included_matching_source_date",
+          source_sync_event_id: result.syncLogId,
           sync_state: "ok",
         }),
       ]),

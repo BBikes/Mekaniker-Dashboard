@@ -342,4 +342,64 @@ describe("reports data helpers", () => {
       avgHoursPerTicket: 0,
     });
   });
+
+  it("returns traceability fields in detailed rows and exports them in CSV", async () => {
+    const detailedRow = {
+      mechanic_id: "m-a",
+      stat_date: "2026-04-14",
+      source_stat_date: "2026-04-14",
+      source_decision_reason: "included_matching_source_date",
+      source_sync_event_id: "sync-log-7",
+      ticket_id: 2001,
+      ticket_material_id: 88,
+      mechanic_item_no: "MEK-2001",
+      baseline_quantity: 0,
+      current_quantity: 8,
+      today_added_quantity: 8,
+      today_added_hours: 2,
+      source_payment_id: null,
+      source_amountpaid: null,
+      source_updated_at: "2026-04-14T10:00:00Z",
+      anomaly_code: null,
+      mechanic: { mechanic_name: "Bente" },
+    };
+    const { reports } = await loadReportsModule({
+      daily_ticket_item_baselines: [
+        {
+          count: 1,
+          data: [detailedRow],
+        },
+        {
+          data: [detailedRow],
+        },
+      ],
+    });
+
+    const page = await reports.getDetailedPage({
+      fromDate: "2026-04-01",
+      toDate: "2026-04-30",
+      periodMode: "daily",
+      page: 1,
+      pageSize: 25,
+    });
+    const csv = await reports.buildCsv({
+      exportMode: "detailed",
+      fromDate: "2026-04-01",
+      toDate: "2026-04-30",
+      periodMode: "daily",
+    });
+
+    expect(page.rows).toEqual([
+      expect.objectContaining({
+        statDate: "2026-04-14",
+        sourceStatDate: "2026-04-14",
+        sourceDecisionReason: "included_matching_source_date",
+        sourceSyncEventId: "sync-log-7",
+        ticketMaterialId: 88,
+        hours: 2,
+      }),
+    ]);
+    expect(csv).toContain("Kilde dato;Beslutningsgrund;Sync-event-ID");
+    expect(csv).toContain("2026-04-14;2026-04-14;included_matching_source_date;sync-log-7;Bente;2001;88");
+  });
 });

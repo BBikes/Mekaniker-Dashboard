@@ -53,6 +53,9 @@ export type SummaryRow = {
 export type DetailedRow = {
   mechanicId: string;
   statDate: string;
+  sourceStatDate: string | null;
+  sourceDecisionReason: string | null;
+  sourceSyncEventId: string | null;
   mechanicName: string;
   ticketId: number;
   ticketMaterialId: number;
@@ -558,7 +561,7 @@ function createDetailedBaseQuery(count?: "exact") {
   return supabase
     .from("daily_ticket_item_baselines")
     .select(
-      "mechanic_id, stat_date, ticket_id, ticket_material_id, mechanic_item_no, baseline_quantity, current_quantity, today_added_quantity, today_added_hours, source_payment_id, source_amountpaid, source_updated_at, anomaly_code, mechanic:mechanic_item_mapping(mechanic_name)",
+      "mechanic_id, stat_date, source_stat_date, source_decision_reason, source_sync_event_id, ticket_id, ticket_material_id, mechanic_item_no, baseline_quantity, current_quantity, today_added_quantity, today_added_hours, source_payment_id, source_amountpaid, source_updated_at, anomaly_code, mechanic:mechanic_item_mapping(mechanic_name)",
       count ? { count } : undefined,
     );
 }
@@ -567,6 +570,9 @@ function toDetailedRows(
   rows: Array<{
     mechanic_id: unknown;
     stat_date: unknown;
+    source_stat_date: unknown;
+    source_decision_reason: unknown;
+    source_sync_event_id: unknown;
     ticket_id: unknown;
     ticket_material_id: unknown;
     mechanic_item_no: unknown;
@@ -584,6 +590,9 @@ function toDetailedRows(
   return rows.map((row) => ({
     mechanicId: row.mechanic_id as string,
     statDate: row.stat_date as string,
+    sourceStatDate: (row.source_stat_date as string | null) ?? null,
+    sourceDecisionReason: (row.source_decision_reason as string | null) ?? null,
+    sourceSyncEventId: (row.source_sync_event_id as string | null) ?? null,
     mechanicName: row.mechanic?.mechanic_name ?? "Unknown mechanic",
     ticketId: toNumeric(row.ticket_id),
     ticketMaterialId: toNumeric(row.ticket_material_id),
@@ -945,6 +954,9 @@ export async function buildCsv(filters: (ReportFilters | AdminDetailedFilters) &
   const rows = await getDetailedRows(filters);
   const header = [
     "Dato",
+    "Kilde dato",
+    "Beslutningsgrund",
+    "Sync-event-ID",
     "Mekaniker",
     "Ticket-ID",
     "Ticket-linje-ID",
@@ -961,6 +973,9 @@ export async function buildCsv(filters: (ReportFilters | AdminDetailedFilters) &
   const lines = rows.map((row) =>
     [
       row.statDate,
+      row.sourceStatDate,
+      row.sourceDecisionReason,
+      row.sourceSyncEventId,
       row.mechanicName,
       row.ticketId,
       row.ticketMaterialId,
