@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getDailyTargetHoursForDate, getTargetHoursBetween } from "@/lib/targets";
@@ -44,7 +44,7 @@ export type DashboardBoardType =
 export type DashboardFocusMetricKey = "today" | "current_week" | "current_month";
 
 export const DASHBOARD_FOCUS_METRIC_OPTIONS: Array<{ key: DashboardFocusMetricKey; label: string }> = [
-  { key: "today", label: "I dag" },
+  { key: "today", label: "I går" },
   { key: "current_week", label: "Aktuel uge" },
   { key: "current_month", label: "Aktuel måned" },
 ];
@@ -250,13 +250,15 @@ export function getDashboardWindow(boardType: DashboardBoardType, today = getCop
         toDate,
       };
     }
-    case "current_week":
+    case "current_week": {
+      const yesterday = addDays(today, -1);
       return {
         title: "Aktuel uge",
-        subtitle: "Mandag til i dag",
+        subtitle: "Mandag til i går",
         fromDate: getStartOfWeek(today),
-        toDate: today,
+        toDate: yesterday,
       };
+    }
     case "current_month":
       return {
         title: "Aktuel måned",
@@ -293,13 +295,15 @@ export function getDashboardWindow(boardType: DashboardBoardType, today = getCop
         toDate: today,
       };
     case "today":
-    default:
+    default: {
+      const yesterday = addDays(today, -1);
       return {
-        title: "I dag",
-        subtitle: "Dagens registreringer",
-        fromDate: today,
-        toDate: today,
+        title: "I går",
+        subtitle: "Gårsdagens registreringer",
+        fromDate: yesterday,
+        toDate: yesterday,
       };
+    }
   }
 }
 
@@ -459,15 +463,15 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
   const currentMonth = getDashboardWindow("current_month", today);
   const selectedMetricKeys = normalizeFocusMetricKeys(setting.selectedFocusMetricKeys);
 
-  const [todayTotals, weekTotals, monthTotals, todayTargetHours, weekTargetHours, monthTargetHours] = await Promise.all([
-    getAggregatedTotals(today, today),
+  const yesterday = addDays(today, -1);
+  const [yesterdayTotals, weekTotals, monthTotals, yesterdayTargetHours, weekTargetHours, monthTargetHours] = await Promise.all([
+    getAggregatedTotals(yesterday, yesterday),
     getAggregatedTotals(currentWeek.fromDate, currentWeek.toDate),
     getAggregatedTotals(currentMonth.fromDate, currentMonth.toDate),
-    getDailyTargetHoursForDate(today),
+    getDailyTargetHoursForDate(yesterday),
     getTargetHoursBetween(currentWeek.fromDate, currentWeek.toDate),
     getTargetHoursBetween(currentMonth.fromDate, currentMonth.toDate),
   ]);
-
   const selectedMechanics = mappings.filter((mapping) => setting.selectedMechanicIds.includes(mapping.id));
 
   return {
@@ -479,7 +483,7 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
       .map((metricKey) => {
         switch (metricKey) {
           case "today":
-            return formatShortDateRange(today, today);
+            return formatShortDateRange(yesterday, yesterday);
           case "current_week":
             return formatShortDateRange(currentWeek.fromDate, currentWeek.toDate);
           case "current_month":
@@ -496,10 +500,10 @@ async function buildFocusBoard(setting: DashboardViewSetting, mappings: Mechanic
           case "today":
             return {
               key: "today",
-              label: "I dag",
-              hours: toNumber(todayTotals.get(mapping.id)?.hours_total),
-              quarters: toNumber(todayTotals.get(mapping.id)?.quarters_total),
-              targetHours: todayTargetHours,
+              label: "I går",
+              hours: toNumber(yesterdayTotals.get(mapping.id)?.hours_total),
+              quarters: toNumber(yesterdayTotals.get(mapping.id)?.quarters_total),
+              targetHours: yesterdayTargetHours,
             } satisfies DashboardFocusMetric;
           case "current_week":
             return {
