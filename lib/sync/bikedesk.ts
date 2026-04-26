@@ -6,6 +6,7 @@
  * - For each ticket, fetch all materials
  * - Filter materials by mechanic SKUs (client-side — API filter is unreliable)
  * - Sum amount per mechanic for today
+ * - Track which ticket IDs each mechanic has time on
  * - UPSERT into daily_totals (overwrite today's row)
  *
  * This is correct because:
@@ -30,7 +31,8 @@ export type Mechanic = {
 export type SyncResult = {
   ticketsFetched: number;
   materialsProcessed: number;
-  mechanicTotals: Record<string, number>; // mechanic_id -> quarters today
+  mechanicTotals: Record<string, number>;      // mechanic_id -> quarters today
+  mechanicTicketIds: Record<string, number[]>; // mechanic_id -> ticket IDs with time today
   syncDate: string; // YYYY-MM-DD
   durationMs: number;
 };
@@ -53,7 +55,6 @@ async function fetchJson(url: string, token: string): Promise<unknown> {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     },
-    // No caching — always fresh data
     cache: "no-store",
   });
 
@@ -104,7 +105,6 @@ async function fetchUpdatedTickets(
       }
     }
 
-    // Check if there are more pages
     const p = payload as Record<string, unknown>;
     const hasMore = p.hasMore === true || (Array.isArray(p.content) && p.content.length === PAGE_SIZE);
     if (!hasMore || items.length < PAGE_SIZE) break;
@@ -156,11 +156,11 @@ export async function runDailySync(
   // Fetch all tickets updated today
   const ticketIds = await fetchUpdatedTickets(baseUrl, token, updatedAfter);
 
-  // For each ticket, fetch materials and sum mechanic quarters
+  // For each ticket, fetch materials and sum mechanic quarters + track ticket IDs
   const mechanicTotals: Record<string, number> = {};
+  const mechanicTicketIds: Record<string, Set<number>> = {};
   let materialsProcessed = 0;
 
-  // Process tickets in batches to avoid overwhelming the API
   const BATCH_SIZE = 10;
   for (let i = 0; i < ticketIds.length; i += BATCH_SIZE) {
     const batch = ticketIds.slice(i, i + BATCH_SIZE);
@@ -168,7 +168,10 @@ export async function runDailySync(
       batch.map((id) => fetchTicketMaterials(baseUrl, token, id)),
     );
 
-    for (const materials of batchResults) {
+    for (let j = 0; j < batchResults.length; j++) {
+      const materials = batchResults[j];
+      const ticketId = batch[j];
+
       for (const mat of materials) {
         materialsProcessed++;
         const pno = mat.productno?.trim().toUpperCase();
@@ -178,15 +181,30 @@ export async function runDailySync(
         if (!mechanicId) continue;
 
         const qty = typeof mat.amount === "number" ? mat.amount : 0;
-        mechanicTotals[mechanicId] = (mechanicTotals[mechanicId] ?? 0) + qty;
+        if (qty > 0) {
+          mechanicTotals[mechanicId] = (mechanicTotals[mechanicId] ?? 0) + qty;
+
+          // Track this ticket ID for the mechanic
+          if (!mechanicTicketIds[mechanicId]) {
+            mechanicTicketIds[mechanicId] = new Set();
+          }
+          mechanicTicketIds[mechanicId].add(ticketId);
+        }
       }
     }
+  }
+
+  // Convert Sets to sorted arrays
+  const mechanicTicketIdsArrays: Record<string, number[]> = {};
+  for (const [mechanicId, ticketSet] of Object.entries(mechanicTicketIds)) {
+    mechanicTicketIdsArrays[mechanicId] = Array.from(ticketSet).sort((a, b) => a - b);
   }
 
   return {
     ticketsFetched: ticketIds.length,
     materialsProcessed,
     mechanicTotals,
+    mechanicTicketIds: mechanicTicketIdsArrays,
     syncDate: today,
     durationMs: Date.now() - start,
   };

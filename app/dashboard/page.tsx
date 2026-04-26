@@ -2,6 +2,15 @@
 
 import { useEffect, useState, useCallback } from "react";
 
+type BoardType = "today" | "yesterday" | "current_week" | "current_month";
+
+type BoardSetting = {
+  board_type: BoardType;
+  active: boolean;
+  label: string;
+  sort_order: number;
+};
+
 type PeriodTotals = {
   mechanic_id: string;
   quarters: number;
@@ -17,21 +26,21 @@ type Mechanic = {
 };
 
 type DashboardApiData = {
+  today: PeriodTotals[];
   yesterday: PeriodTotals[];
   current_week: PeriodTotals[];
   current_month: PeriodTotals[];
   lastSyncAt: string | null;
   mechanics: Mechanic[];
   periods: {
+    today: string;
     yesterday: string;
     weekStart: string;
     monthStart: string;
   };
+  boardSettings: BoardSetting[];
 };
 
-type BoardType = "yesterday" | "current_week" | "current_month";
-
-const BOARDS: BoardType[] = ["yesterday", "current_week", "current_month"];
 const ROTATION_MS = 15000;
 
 function formatDate(iso: string): string {
@@ -45,14 +54,16 @@ function formatTime(iso: string | null): string {
   return d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
 }
 
-function boardLabel(board: BoardType, periods: DashboardApiData["periods"]): string {
+function boardLabel(board: BoardType, label: string, periods: DashboardApiData["periods"]): string {
   switch (board) {
+    case "today":
+      return `${label} — ${formatDate(periods.today)}`;
     case "yesterday":
-      return `I går — ${formatDate(periods.yesterday)}`;
+      return `${label} — ${formatDate(periods.yesterday)}`;
     case "current_week":
-      return `Aktuel uge — ${formatDate(periods.weekStart)}–${formatDate(periods.yesterday)}`;
+      return `${label} — ${formatDate(periods.weekStart)}–${formatDate(periods.yesterday)}`;
     case "current_month":
-      return `Aktuel måned — ${periods.monthStart.slice(5, 7)}/${periods.monthStart.slice(0, 4)}`;
+      return `${label} — ${periods.monthStart.slice(5, 7)}/${periods.monthStart.slice(0, 4)}`;
   }
 }
 
@@ -68,8 +79,10 @@ function countWorkDays(from: string, to: string): number {
   return Math.max(days, 1);
 }
 
-function getPeriodTargetMultiplier(board: BoardType, periods: DashboardApiData["periods"]): number {
+function getTargetMultiplier(board: BoardType, periods: DashboardApiData["periods"]): number {
   switch (board) {
+    case "today":
+      return 1;
     case "yesterday":
       return 1;
     case "current_week":
@@ -179,12 +192,20 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Rotation: advance board index, skip inactive boards
   useEffect(() => {
     const interval = setInterval(() => {
-      setBoardIndex((i) => (i + 1) % BOARDS.length);
+      setBoardIndex((i) => {
+        if (!data) return i;
+        const activeBoards = data.boardSettings
+          .filter((b) => b.active)
+          .sort((a, b) => a.sort_order - b.sort_order);
+        if (activeBoards.length === 0) return i;
+        return (i + 1) % activeBoards.length;
+      });
     }, ROTATION_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [data]);
 
   if (error) {
     return (
@@ -209,9 +230,26 @@ export default function DashboardPage() {
     .filter((m) => m.active)
     .sort((a, b) => a.display_order - b.display_order);
 
-  const currentBoard = BOARDS[boardIndex];
+  const activeBoards = data.boardSettings
+    .filter((b) => b.active)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (activeBoards.length === 0) {
+    return (
+      <div className="dashboard-shell" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "#999" }}>Ingen aktive boards</p>
+          <p style={{ color: "#bbb" }}>Aktivér mindst ét board i Indstillinger.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const safeIndex = boardIndex % activeBoards.length;
+  const currentBoardSetting = activeBoards[safeIndex];
+  const currentBoard = currentBoardSetting.board_type;
   const totals = data[currentBoard];
-  const targetMultiplier = getPeriodTargetMultiplier(currentBoard, data.periods);
+  const targetMultiplier = getTargetMultiplier(currentBoard, data.periods);
 
   return (
     <div className="dashboard-shell">
@@ -219,14 +257,14 @@ export default function DashboardPage() {
         <div className="dashboard-header">
           <div>
             <p className="eyebrow">B-Bikes Værksted</p>
-            <h1>{boardLabel(currentBoard, data.periods)}</h1>
+            <h1>{boardLabel(currentBoard, currentBoardSetting.label, data.periods)}</h1>
           </div>
           <div className="dashboard-meta">
             <p className="muted" style={{ fontSize: "0.85rem" }}>
               Sidst synkroniseret {formatTime(data.lastSyncAt)}
             </p>
             <p className="muted" style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-              {boardIndex + 1} / {BOARDS.length}
+              {safeIndex + 1} / {activeBoards.length}
             </p>
           </div>
         </div>
@@ -238,14 +276,14 @@ export default function DashboardPage() {
         />
 
         <div style={{ display: "flex", justifyContent: "center", gap: "8px" }}>
-          {BOARDS.map((_, i) => (
+          {activeBoards.map((_, i) => (
             <div
               key={i}
               style={{
                 width: "8px",
                 height: "8px",
                 borderRadius: "50%",
-                background: i === boardIndex ? "var(--accent)" : "var(--line)",
+                background: i === safeIndex ? "var(--accent)" : "var(--line)",
                 transition: "background 0.3s",
               }}
             />

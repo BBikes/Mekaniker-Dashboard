@@ -9,11 +9,12 @@ import type { SyncResult } from "./bikedesk";
 export async function saveSyncResult(result: SyncResult): Promise<void> {
   const db = createAdminClient();
 
-  // Upsert daily_totals for each mechanic
+  // Upsert daily_totals for each mechanic — includes ticket_ids
   const rows = Object.entries(result.mechanicTotals).map(([mechanic_id, quarters]) => ({
     mechanic_id,
     work_date: result.syncDate,
-    quarters: Math.round(quarters), // amount should be integer, but round just in case
+    quarters: Math.round(quarters),
+    ticket_ids: result.mechanicTicketIds[mechanic_id] ?? [],
     synced_at: new Date().toISOString(),
   }));
 

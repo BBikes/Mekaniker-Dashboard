@@ -1,10 +1,13 @@
 /**
  * Fetches and aggregates daily_totals from Supabase.
  *
- * Three periods (all end at yesterday — data is only reliable after 16:00 sync):
- * - yesterday: single day
- * - current_week: Monday → yesterday
+ * Four periods:
+ * - today:         today (data from the most recent sync run today)
+ * - yesterday:     yesterday
+ * - current_week:  Monday → yesterday
  * - current_month: 1st of month → yesterday
+ *
+ * Note: "today" only has data after a sync has been run (manual or 16:00 auto).
  */
 
 import { createAdminClient } from "@/lib/supabase/server";
@@ -16,6 +19,7 @@ export type PeriodTotals = {
 };
 
 export type DashboardData = {
+  today: PeriodTotals[];
   yesterday: PeriodTotals[];
   current_week: PeriodTotals[];
   current_month: PeriodTotals[];
@@ -24,20 +28,17 @@ export type DashboardData = {
 };
 
 /**
- * Returns date strings for the three periods, relative to "today" in Copenhagen time.
- * All periods end at yesterday (inclusive).
+ * Returns date strings for all four periods, relative to "today" in Copenhagen time.
  */
 export function getPeriodDates(now?: Date): {
+  today: string;
   yesterday: string;
   weekStart: string;
   monthStart: string;
 } {
   // Use Copenhagen time (UTC+2 in summer, UTC+1 in winter)
-  // We use a simple offset: if the server is UTC, add 2h for CEST
   const d = now ?? new Date();
-
-  // Get Copenhagen date
-  const copenhagenOffset = 2; // CEST (summer) — adjust if needed
+  const copenhagenOffset = 2; // CEST (summer)
   const local = new Date(d.getTime() + copenhagenOffset * 60 * 60 * 1000);
 
   const todayStr = local.toISOString().slice(0, 10);
@@ -58,19 +59,19 @@ export function getPeriodDates(now?: Date): {
   // Start of current month
   const monthStart = `${todayStr.slice(0, 7)}-01`;
 
-  return { yesterday, weekStart, monthStart };
+  return { today: todayStr, yesterday, weekStart, monthStart };
 }
 
 export async function getDashboardData(mechanics: Mechanic[]): Promise<DashboardData> {
   const db = createAdminClient();
-  const { yesterday, weekStart, monthStart } = getPeriodDates();
+  const { today, yesterday, weekStart, monthStart } = getPeriodDates();
 
-  // Fetch all rows from the earliest needed date to yesterday
+  // Fetch all rows from the earliest needed date to today (inclusive)
   const { data, error } = await db
     .from("daily_totals")
     .select("mechanic_id, work_date, quarters")
     .gte("work_date", monthStart)
-    .lte("work_date", yesterday);
+    .lte("work_date", today);
 
   if (error) throw new Error(`Failed to fetch daily_totals: ${error.message}`);
 
@@ -103,6 +104,7 @@ export async function getDashboardData(mechanics: Mechanic[]): Promise<Dashboard
     .single();
 
   return {
+    today: aggregate(today, today),
     yesterday: aggregate(yesterday, yesterday),
     current_week: aggregate(weekStart, yesterday),
     current_month: aggregate(monthStart, yesterday),
@@ -113,7 +115,7 @@ export async function getDashboardData(mechanics: Mechanic[]): Promise<Dashboard
 
 /**
  * Compute the target (in quarters) for a period based on working days.
- * Working days = Mon–Fri, excluding Danish public holidays (simplified: no holiday check).
+ * Working days = Mon–Fri (no Danish public holiday check).
  */
 export function computeTarget(
   mechanic: Mechanic,
@@ -126,7 +128,7 @@ export function computeTarget(
 
   while (cur <= end) {
     const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) workDays++; // Mon–Fri
+    if (dow !== 0 && dow !== 6) workDays++;
     cur.setDate(cur.getDate() + 1);
   }
 
