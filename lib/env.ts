@@ -28,6 +28,16 @@ export function getServerConfig() {
     bikeDeskApiToken: getRequiredEnv("C1ST_API_TOKEN"),
     bikeDeskApiBaseUrl: getOptionalEnv("C1ST_API_BASE_URL", "https://api.c1st.com/api")!,
     cronSecret: readEnv("CRON_SECRET"),
+    // Backwards compatibility for old c1st/client.ts
+    c1stApiToken: getRequiredEnv("C1ST_API_TOKEN"),
+    c1stApiBaseUrl: getOptionalEnv("C1ST_API_BASE_URL", "https://api.c1st.com/api")!,
+    c1stDefaultPageLength: Number.parseInt(getOptionalEnv("C1ST_DEFAULT_PAGE_LENGTH", "200")!, 10),
+    c1stUseUpdatedAfter: getOptionalEnv("C1ST_USE_UPDATED_AFTER", "false") === "true",
+    c1stUpdatedAfterParam: getOptionalEnv("C1ST_UPDATED_AFTER_PARAM", "updated_after")!,
+    c1stTicketMaterialProductNoParam: getOptionalEnv("C1ST_TICKET_MATERIAL_PRODUCT_NO_PARAM", "productno")!,
+    c1stExtraTicketMaterialQuery: getOptionalEnv("C1ST_EXTRA_TICKET_MATERIAL_QUERY", "")!,
+    cykelPlusTag: getOptionalEnv("CYKELPLUS_TAG", "CykelPlus")!,
+    syncSkipPayments: getOptionalEnv("SYNC_SKIP_PAYMENTS", "false") === "true",
   };
 }
 
