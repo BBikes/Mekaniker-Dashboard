@@ -1,26 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { toOperatorErrorMessage } from "@/lib/env";
-import { probeCustomersFirstTicketMaterials } from "@/lib/sync/run-phase-one-sync";
-import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
+// This probe endpoint is no longer used in the new sync architecture.
+// Kept as a stub to avoid breaking imports.
 
-export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getCurrentUserOrNull();
-  if (!user) {
-    return createUnauthorizedApiResponse();
-  }
-
-  try {
-    const result = await probeCustomersFirstTicketMaterials();
-    return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: toOperatorErrorMessage(error, "Ukendt probe-fejl."),
-      },
-      { status: 500 },
-    );
-  }
+  return NextResponse.json({ message: "Probe endpoint deprecated. Use /api/sync/manual instead." }, { status: 410 });
 }

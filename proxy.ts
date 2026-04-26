@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = ["/login", "/_next", "/favicon.ico", "/dashboard", "/api/dashboard"];
 const PUBLIC_FILE_PATTERN = /.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$/;
 
 function isPublicPath(pathname: string) {

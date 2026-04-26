@@ -1,337 +1,282 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-
-import { AppHeader } from "@/components/app-header";
-import { DASHBOARD_FOCUS_METRIC_OPTIONS, getDashboardViewSettings } from "@/lib/data/dashboard";
-import { createAdminClient } from "@/lib/supabase/server";
-import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
-
-import {
-  saveSettingsAction,
-  saveRevenueTargetsAction,
-} from "./actions";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+type Mechanic = {
+  id: string;
+  name: string;
+  sku: string;
+  display_order: number;
+  active: boolean;
+  daily_target_quarters: number;
+};
 
-export default async function SettingsPage({ searchParams }: { searchParams: SearchParams }) {
-  const env = getEnvPresence();
-  const params = await searchParams;
-  const message = typeof params.message === "string" ? params.message : null;
-  const kind = typeof params.kind === "string" ? params.kind : null;
+type MechanicRow = Mechanic & { _dirty: boolean; _saving: boolean };
 
-  if (!env.dashboardReady) {
-    return (
-      <>
-        <AppHeader activeHref="/settings" />
-        <main className="page-shell">
-          <section className="panel">
-            <p className="eyebrow">Indstillinger utilgængelige</p>
-            <h2>Serverdata er ikke klar</h2>
-            <p className="muted">{getDashboardReadinessMessage(env) ?? "Supabase er ikke konfigureret korrekt."}</p>
-            <p className="inline-links">
-              <Link href="/">Tilbage til kontrolpanel</Link>
-            </p>
-          </section>
-        </main>
-      </>
+function generateId(): string {
+  return `mech_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export default function SettingsPage() {
+  const [mechanics, setMechanics] = useState<MechanicRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [globalSaving, setGlobalSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const fetchMechanics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/mechanics");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as Mechanic[];
+      setMechanics(json.map((m) => ({ ...m, _dirty: false, _saving: false })));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fejl");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchMechanics();
+  }, [fetchMechanics]);
+
+  function updateRow(id: string, field: keyof Mechanic, value: unknown) {
+    setMechanics((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, [field]: value, _dirty: true } : m)),
     );
   }
 
-  let mechanics: Array<{
-    id: string;
-    mechanic_name: string;
-    mechanic_item_no: string;
-    display_order: number;
-    active: boolean;
-  }> = [];
-  let dashboardViews: Awaited<ReturnType<typeof getDashboardViewSettings>> = [];
-  let revenueTargets: Record<string, number> = { arbeidstid: 0, repair: 0, cykelplus: 0, hourly_rate: 450 };
-  let loadError: string | null = null;
-
-  try {
-    const supabase = createAdminClient();
-    const [{ data, error }, views, { data: targetsData }] = await Promise.all([
-      supabase
-        .from("mechanic_item_mapping")
-        .select("id, mechanic_name, mechanic_item_no, display_order, active")
-        .order("display_order", { ascending: true })
-        .order("mechanic_name", { ascending: true }),
-      getDashboardViewSettings(),
-      supabase.from("revenue_kpi_targets").select("metric_key, daily_target"),
-    ]);
-
-    for (const row of (targetsData ?? []) as Array<{ metric_key: string; daily_target: number }>) {
-      revenueTargets[row.metric_key] = Number(row.daily_target ?? 0);
-    }
-
-    if (error) {
-      throw error;
-    }
-
-    mechanics = (data ?? []) as typeof mechanics;
-    dashboardViews = views;
-  } catch (error) {
-    loadError = toOperatorErrorMessage(error, "Kunne ikke hente mekanikeropsætning.");
+  function addMechanic() {
+    const newMechanic: MechanicRow = {
+      id: generateId(),
+      name: "",
+      sku: "",
+      display_order: mechanics.length + 1,
+      active: true,
+      daily_target_quarters: 30,
+      _dirty: true,
+      _saving: false,
+    };
+    setMechanics((prev) => [...prev, newMechanic]);
   }
 
+  async function saveAll() {
+    const dirty = mechanics.filter((m) => m._dirty);
+    if (dirty.length === 0) {
+      setSaveMessage("Ingen ændringer at gemme.");
+      setTimeout(() => setSaveMessage(null), 3000);
+      return;
+    }
+
+    setGlobalSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const res = await fetch("/api/settings/mechanics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dirty.map(({ _dirty: _d, _saving: _s, ...m }) => m)),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      setMechanics((prev) => prev.map((m) => ({ ...m, _dirty: false })));
+      setSaveMessage("Gemt!");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (e) {
+      setSaveMessage(`Fejl: ${e instanceof Error ? e.message : "Ukendt fejl"}`);
+    } finally {
+      setGlobalSaving(false);
+    }
+  }
+
+  async function deleteMechanic(id: string) {
+    if (!confirm("Er du sikker på at du vil slette denne mekaniker?")) return;
+    try {
+      const res = await fetch(`/api/settings/mechanics/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMechanics((prev) => prev.filter((m) => m.id !== id));
+    } catch (e) {
+      alert(`Fejl ved sletning: ${e instanceof Error ? e.message : "Ukendt fejl"}`);
+    }
+  }
+
+  const dirtyCount = mechanics.filter((m) => m._dirty).length;
+
   return (
-    <>
-      <AppHeader activeHref="/settings" />
-      <main className="page-shell">
-        <section className="hero">
-          <div className="hero__top">
+    <main className="page-shell">
+      <div className="hero">
+        <div className="hero__top">
+          <div>
+            <p className="eyebrow">B-Bikes</p>
+            <h1>Indstillinger</h1>
+          </div>
+        </div>
+        <p className="muted">
+          Administrer mekanikere, varenumre og daglige mål. Mål angives i antal påbegyndte 15-minutters enheder pr. dag.
+        </p>
+      </div>
+
+      <nav className="nav">
+        <Link href="/" className="nav__link">Kontrolpanel</Link>
+        <Link href="/reports" className="nav__link">Rapporter</Link>
+        <span className="nav__link nav__link--active">Indstillinger</span>
+        <Link href="/dashboard" className="nav__link" target="_blank">TV-dashboard ↗</Link>
+      </nav>
+
+      {loading && <p className="muted">Indlæser…</p>}
+
+      {error && (
+        <div className="response-box response-box--error" style={{ marginBottom: "24px" }}>
+          <p className="response-box__label">Fejl</p>
+          <pre>{error}</pre>
+        </div>
+      )}
+
+      {!loading && (
+        <div className="panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <p className="eyebrow">Indstillinger</p>
-              <h1>Mekanikere og TV-boards</h1>
-            </div>
-          </div>
-          <p>Vedligehold mappings for mekanikere og styr hvilke dashboards TV-visningen roterer igennem.</p>
-        </section>
-
-        {message ? <p className={`flash ${kind === "success" ? "flash--success" : "flash--error"}`}>{message}</p> : null}
-        {loadError ? <p className="flash flash--error">{loadError}</p> : null}
-
-        <form action={saveSettingsAction} className="settings-page-form">
-          <div className="settings-page-actions">
-            <button className="button button--accent" type="submit">
-              Gem ændringer
-            </button>
-          </div>
-
-          <section className="panel settings-panel">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Ny mekaniker</p>
-                <h2>Tilføj mapping</h2>
-              </div>
-              <p className="muted">Varenummeret skal matche den mekanikerlinje, der registreres på arbejdskortet.</p>
-            </div>
-            <div className="settings-form-grid">
-              <div className="field">
-                <label htmlFor="new-mechanic-name">Navn</label>
-                <input id="new-mechanic-name" name="new_mechanic_name" type="text" />
-              </div>
-              <div className="field">
-                <label htmlFor="new-mechanic-item-no">Varenummer</label>
-                <input id="new-mechanic-item-no" name="new_mechanic_item_no" type="text" />
-              </div>
-              <div className="field">
-                <label htmlFor="new-display-order">Rækkefølge</label>
-                <input defaultValue={mechanics.length} id="new-display-order" min="0" name="new_display_order" step="1" type="number" />
-              </div>
-              <label className="checkbox-field">
-                <input defaultChecked name="new_active" type="checkbox" />
-                Aktiv
-              </label>
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Eksisterende mappings</p>
-                <h2>Vedligehold</h2>
-              </div>
-              <p className="muted">Mål beregnes automatisk som 7,5 timer mandag til torsdag, 7,0 timer fredag og 0 timer i weekender og på danske helligdage.</p>
-            </div>
-
-            {mechanics.length > 0 ? (
-              <div className="table-wrap">
-                <table className="settings-table">
-                  <thead>
-                    <tr>
-                      <th>Navn</th>
-                      <th>Varenummer</th>
-                      <th>Rækkefølge</th>
-                      <th>Aktiv</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mechanics.map((mechanic) => (
-                      <tr key={mechanic.id}>
-                        <td>
-                          <input name="id" type="hidden" value={mechanic.id} />
-                          <input defaultValue={mechanic.mechanic_name} name="mechanic_name" required type="text" />
-                        </td>
-                        <td>
-                          <input defaultValue={mechanic.mechanic_item_no} name="mechanic_item_no" required type="text" />
-                        </td>
-                        <td>
-                          <input defaultValue={mechanic.display_order} min="0" name="display_order" step="1" type="number" />
-                        </td>
-                        <td>
-                          <input defaultChecked={mechanic.active} name="active_ids" type="checkbox" value={mechanic.id} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="muted">Ingen mekanikere endnu. Opret den første mapping ovenfor for at gøre sync og dashboard brugbare.</p>
-            )}
-          </section>
-
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">TV-dashboard</p>
-                <h2>Boards og rotation</h2>
-              </div>
-              <p className="muted">Aktive boards vises i rækkefølge på TV-siden. Varighed angives i sekunder.</p>
-            </div>
-
-            {dashboardViews.length > 0 ? (
-              <div className="table-wrap">
-                <table className="settings-table">
-                  <thead>
-                    <tr>
-                      <th>Board</th>
-                      <th>Varighed (sek.)</th>
-                      <th>Rækkefølge</th>
-                      <th>Aktiv</th>
-                      <th>Fokusvalg</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashboardViews.map((view) => {
-                      const isFocusBoard = view.boardType === "mechanic_focus";
-
-                      return (
-                        <tr key={view.boardType}>
-                          <td>
-                            <input name="board_type" type="hidden" value={view.boardType} />
-                            <input name="board_title" type="hidden" value={view.boardTitle} />
-                            <strong>{view.boardTitle}</strong>
-                          </td>
-                          <td>
-                            <input defaultValue={view.durationSeconds} min="5" name="duration_seconds" step="1" type="number" />
-                          </td>
-                          <td>
-                            <input defaultValue={view.displayOrder} min="0" name="dashboard_display_order" step="1" type="number" />
-                          </td>
-                          <td>
-                            <input defaultChecked={view.active} name="active_board_types" type="checkbox" value={view.boardType} />
-                          </td>
-                          <td>
-                            {isFocusBoard ? (
-                              <div className="settings-focus-config">
-                                <div className="settings-focus-group">
-                                  <span className="settings-focus-label">Vis 2-3 værdier</span>
-                                  <div className="settings-checklist settings-checklist--horizontal">
-                                    {DASHBOARD_FOCUS_METRIC_OPTIONS.map((metric) => (
-                                      <label className="settings-checklist__item" key={metric.key}>
-                                        <input
-                                          defaultChecked={view.selectedFocusMetricKeys.includes(metric.key)}
-                                          name={`selected_focus_metric_keys_${view.boardType}`}
-                                          type="checkbox"
-                                          value={metric.key}
-                                        />
-                                        <span>{metric.label}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="settings-focus-group">
-                                  <span className="settings-focus-label">Mekanikere</span>
-                                  <div className="settings-checklist settings-checklist--horizontal">
-                                    {mechanics.map((mechanic) => (
-                                      <label className="settings-checklist__item" key={mechanic.id}>
-                                        <input
-                                          defaultChecked={view.selectedMechanicIds.includes(mechanic.id)}
-                                          name={`selected_mechanic_ids_${view.boardType}`}
-                                          type="checkbox"
-                                          value={mechanic.id}
-                                        />
-                                        <span>{mechanic.mechanic_name}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="muted">Bruger alle aktive mekanikere</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="muted">Dashboard-opsætningen er ikke tilgængelig endnu.</p>
-            )}
-          </section>
-        </form>
-
-        <form action={saveRevenueTargetsAction} className="settings-page-form">
-          <div className="settings-page-actions">
-            <button className="button button--accent" type="submit">
-              Gem omsætningsmål
-            </button>
-          </div>
-
-          <section className="panel">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Revenue dashboards</p>
-                <h2>Omsætningsmål</h2>
-              </div>
-              <p className="muted">
-                Daglige mål for omsætnings-dashboards. For uge og måned skaleres målet automatisk med antal arbejdsdage i perioden.
+              <p className="eyebrow">Mekanikere</p>
+              <p className="muted" style={{ fontSize: "0.85rem", margin: "4px 0 0" }}>
+                Mål beregnes automatisk som dagligt mål × antal arbejdsdage i perioden.
               </p>
             </div>
-            <div className="settings-form-grid">
-              <div className="field">
-                <label htmlFor="revenue-target-arbeidstid">Dagligt mål – Omsætning arbejdstid (kr)</label>
-                <input
-                  defaultValue={revenueTargets.arbeidstid}
-                  id="revenue-target-arbeidstid"
-                  min="0"
-                  name="revenue_target_arbeidstid"
-                  step="1"
-                  type="number"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="revenue-target-repair">Dagligt mål – Omsætning reparationer (kr)</label>
-                <input
-                  defaultValue={revenueTargets.repair}
-                  id="revenue-target-repair"
-                  min="0"
-                  name="revenue_target_repair"
-                  step="1"
-                  type="number"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="revenue-target-cykelplus">Mål – CykelPlus kunder (antal)</label>
-                <input
-                  defaultValue={revenueTargets.cykelplus}
-                  id="revenue-target-cykelplus"
-                  min="0"
-                  name="revenue_target_cykelplus"
-                  step="1"
-                  type="number"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="revenue-target-hourly-rate">Timepris (kr/time)</label>
-                <input
-                  defaultValue={revenueTargets.hourly_rate}
-                  id="revenue-target-hourly-rate"
-                  min="0"
-                  name="revenue_target_hourly_rate"
-                  step="1"
-                  type="number"
-                />
-              </div>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              {saveMessage && (
+                <span style={{
+                  fontSize: "0.9rem",
+                  color: saveMessage.startsWith("Fejl") ? "#dc2626" : "#059669",
+                  fontWeight: 600
+                }}>
+                  {saveMessage}
+                </span>
+              )}
+              <button className="button button--ghost" onClick={addMechanic}>
+                + Tilføj mekaniker
+              </button>
+              <button
+                className="button button--accent"
+                onClick={() => void saveAll()}
+                disabled={globalSaving || dirtyCount === 0}
+              >
+                {globalSaving ? "Gemmer…" : dirtyCount > 0 ? `Gem (${dirtyCount})` : "Gem"}
+              </button>
             </div>
-          </section>
-        </form>
-      </main>
-    </>
+          </div>
+
+          {/* Column headers */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1.5fr 80px 80px 40px 40px",
+            gap: "12px",
+            padding: "8px 0 4px",
+            borderBottom: "2px solid var(--line)",
+          }}>
+            {["Navn", "Varenummer (SKU)", "Mål/dag", "Rækkefølge", "Aktiv", ""].map((h, i) => (
+              <span key={i} style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                {h}
+              </span>
+            ))}
+          </div>
+
+          {mechanics.map((m) => (
+            <div
+              key={m.id}
+              className="mechanic-row"
+              style={{
+                gridTemplateColumns: "2fr 1.5fr 80px 80px 40px 40px",
+                opacity: m.active ? 1 : 0.55,
+              }}
+            >
+              <input
+                type="text"
+                value={m.name}
+                placeholder="Navn"
+                onChange={(e) => updateRow(m.id, "name", e.target.value)}
+              />
+              <input
+                type="text"
+                value={m.sku}
+                placeholder="f.eks. 2403B15"
+                onChange={(e) => updateRow(m.id, "sku", e.target.value.toUpperCase())}
+                style={{ fontFamily: "monospace" }}
+              />
+              <input
+                type="number"
+                value={m.daily_target_quarters}
+                min={0}
+                max={100}
+                onChange={(e) => updateRow(m.id, "daily_target_quarters", parseInt(e.target.value) || 0)}
+              />
+              <input
+                type="number"
+                value={m.display_order}
+                min={1}
+                max={99}
+                onChange={(e) => updateRow(m.id, "display_order", parseInt(e.target.value) || 1)}
+              />
+              <input
+                type="checkbox"
+                checked={m.active}
+                onChange={(e) => updateRow(m.id, "active", e.target.checked)}
+              />
+              <button
+                className="button button--danger"
+                style={{ padding: "6px 10px", fontSize: "0.8rem" }}
+                onClick={() => void deleteMechanic(m.id)}
+                title="Slet mekaniker"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+          {mechanics.length === 0 && (
+            <p className="muted" style={{ textAlign: "center", padding: "24px 0" }}>
+              Ingen mekanikere endnu. Klik &quot;+ Tilføj mekaniker&quot; for at komme i gang.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Info box */}
+      <div className="panel" style={{ marginTop: "24px" }}>
+        <p className="eyebrow">Vejledning</p>
+        <h2>Sådan fungerer det</h2>
+        <div className="status-list">
+          <div className="status-item">
+            <div className="status-item__label">
+              <strong>Varenummer (SKU)</strong>
+              <p className="muted" style={{ fontSize: "0.85rem" }}>
+                Det varenummer mekanikeren bruger i BikeDesk til at registrere påbegyndte 15 min. F.eks. <code>2403B15</code>.
+              </p>
+            </div>
+          </div>
+          <div className="status-item">
+            <div className="status-item__label">
+              <strong>Dagligt mål</strong>
+              <p className="muted" style={{ fontSize: "0.85rem" }}>
+                Antal kvarterer pr. arbejdsdag. 30 kvarterer = 7,5 timer. Bruges til mållinjen på TV-dashboardet og opfyldelsesprocenten i rapporter.
+              </p>
+            </div>
+          </div>
+          <div className="status-item">
+            <div className="status-item__label">
+              <strong>Automatisk sync</strong>
+              <p className="muted" style={{ fontSize: "0.85rem" }}>
+                Data synkroniseres automatisk kl. 16:00 hver dag. Du kan også køre en manuel sync fra kontrolpanelet.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }

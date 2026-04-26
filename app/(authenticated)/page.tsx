@@ -1,230 +1,156 @@
-import Link from "next/link";
+"use client";
 
-import { AppHeader } from "@/components/app-header";
-import { InternalActions } from "@/components/internal-actions";
-import { SyncAnomalyBanner } from "@/components/sync-anomaly-banner";
-import { getDashboardAnomalySummary, getDashboardData } from "@/lib/data/dashboard";
-import { getActiveMechanics } from "@/lib/data/reports";
-import { getDashboardReadinessMessage, getEnvPresence, getSyncReadinessMessage, toOperatorErrorMessage } from "@/lib/env";
-import { formatCopenhagenTime, formatHours } from "@/lib/time";
+import { useState } from "react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-type StatusRow = {
-  label: string;
-  present: boolean;
+type SyncResponse = {
+  ok?: boolean;
+  error?: string;
+  syncDate?: string;
+  ticketsFetched?: number;
+  materialsProcessed?: number;
+  mechanicTotals?: Record<string, number>;
+  durationMs?: number;
 };
 
-type StatusGroup = {
-  title: string;
-  summary: string;
-  ready: boolean;
-  rows: StatusRow[];
-};
+export default function ControlPanelPage() {
+  const [syncing, setSyncing] = useState(false);
+  const [result, setResult] = useState<SyncResponse | null>(null);
 
-function getStatusGroups() {
-  const env = getEnvPresence();
-
-  const groups: StatusGroup[] = [
-    {
-      title: "Browser og login",
-      summary: "Bruges til login og den offentlige Supabase-klient i browseren.",
-      ready: env.browserAuthReady,
-      rows: [
-        { label: "NEXT_PUBLIC_SUPABASE_URL", present: env.publicSupabaseUrl },
-        { label: "NEXT_PUBLIC_SUPABASE_ANON_KEY", present: env.supabaseAnonKey },
-      ],
-    },
-    {
-      title: "Server og datasync",
-      summary: "Bruges til dashboarddata, rapporter og manuel sync mod Customers 1st.",
-      ready: env.syncReady,
-      rows: [
-        { label: "Supabase URL (SUPABASE_URL eller NEXT_PUBLIC_SUPABASE_URL)", present: env.resolvedSupabaseUrl },
-        { label: "SUPABASE_SERVICE_ROLE_KEY", present: env.supabaseServiceRoleKey },
-        { label: "C1ST_API_TOKEN", present: env.c1stApiToken },
-      ],
-    },
-    {
-      title: "Scheduler",
-      summary: "Bruges af Supabase Cron til automatisk daglig sync kl. 16:00.",
-      ready: env.schedulerReady,
-      rows: [{ label: "CRON_SECRET", present: env.cronSecret }],
-    },
-  ];
-
-  return { env, groups };
-}
-
-export default async function HomePage() {
-  const { env, groups } = getStatusGroups();
-  const dashboardReadinessMessage = getDashboardReadinessMessage(env);
-  const syncReadinessMessage = getSyncReadinessMessage(env);
-
-  let loadError: string | null = null;
-  let mechanics: Awaited<ReturnType<typeof getActiveMechanics>> = [];
-  let dashboard: Awaited<ReturnType<typeof getDashboardData>> = {
-    statDate: "ikke tilgængelig",
-    statDateLabel: "ikke tilgængelig",
-    rows: [],
-    latestSync: null,
-  };
-  let anomalies: Awaited<ReturnType<typeof getDashboardAnomalySummary>> | null = null;
-
-  if (env.dashboardReady) {
+  async function handleSync() {
+    setSyncing(true);
+    setResult(null);
     try {
-      [dashboard, mechanics, anomalies] = await Promise.all([
-        getDashboardData(),
-        getActiveMechanics(),
-        getDashboardAnomalySummary(),
-      ]);
-    } catch (error) {
-      loadError = toOperatorErrorMessage(error, "Kunne ikke hente data fra Supabase.");
+      const res = await fetch("/api/sync/manual", { method: "POST" });
+      const json = (await res.json()) as SyncResponse;
+      setResult(json);
+    } catch (e) {
+      setResult({ error: e instanceof Error ? e.message : "Ukendt fejl" });
+    } finally {
+      setSyncing(false);
     }
-  } else {
-    loadError = dashboardReadinessMessage;
   }
 
-  const totalHoursToday = dashboard.rows.reduce((sum, row) => sum + row.hours, 0);
-  const latestSyncLabel = dashboard.latestSync?.finishedAt
-    ? `${dashboard.latestSync.status} kl. ${formatCopenhagenTime(dashboard.latestSync.finishedAt)}`
-    : "Ingen sync er kørt endnu";
-
   return (
-    <>
-      <AppHeader activeHref="/" />
-      <SyncAnomalyBanner initialAnomalies={anomalies} />
-      <main className="page-shell">
-        <section className="hero">
-          <div className="hero__top">
-            <div>
-              <p className="eyebrow">Intern app</p>
-              <h1>Kontrolpanel</h1>
-            </div>
-            <div className="inline-links">
-              <Link href="/dashboard" rel="noreferrer" target="_blank">
-                Åbn TV-visning
-              </Link>
-              <Link href="/reports">Åbn rapporter</Link>
-              <Link href="/settings">Åbn indstillinger</Link>
-            </div>
+    <main className="page-shell">
+      <div className="hero">
+        <div className="hero__top">
+          <div>
+            <p className="eyebrow">B-Bikes</p>
+            <h1>Kontrolpanel</h1>
           </div>
-          <p>
-            Herfra kan du åbne TV-dashboardet, gennemgå rapporter, vedligeholde mekanikere og køre manuel sync mod
-            Customers 1st.
+        </div>
+        <p className="muted">
+          Administrer synkronisering og se systemstatus. TV-dashboardet opdateres automatisk kl. 16:00 hver dag.
+        </p>
+      </div>
+
+      {/* Navigation */}
+      <nav className="nav">
+        <span className="nav__link nav__link--active">Kontrolpanel</span>
+        <Link href="/reports" className="nav__link">Rapporter</Link>
+        <Link href="/settings" className="nav__link">Indstillinger</Link>
+        <Link href="/dashboard" className="nav__link" target="_blank">TV-dashboard ↗</Link>
+      </nav>
+
+      <div className="panel-grid">
+        {/* Sync panel */}
+        <div className="panel">
+          <p className="eyebrow">Synkronisering</p>
+          <h2>Kør sync nu</h2>
+          <p className="muted">
+            Henter alle BikeDesk-opgaver opdateret i dag og beregner mekanikernes kvarterer for i dag.
+            Kør dette hvis du vil se opdaterede tal med det samme — ellers kører det automatisk kl. 16:00.
           </p>
-        </section>
+          <div className="action-row" style={{ marginBottom: 0 }}>
+            <button
+              className="button button--accent"
+              onClick={() => void handleSync()}
+              disabled={syncing}
+            >
+              {syncing ? "Synkroniserer…" : "Sync"}
+            </button>
+          </div>
 
-        <section className="panel-grid panel-grid--metrics">
-          <article className="panel">
-            <p className="eyebrow">I dag</p>
-            <h2>Registreret tid</h2>
-            <p className="metric">{formatHours(totalHoursToday)}</p>
-            <p className="muted">
-              Fordelt på {dashboard.rows.length} mekanikere · {dashboard.statDateLabel}
-            </p>
-          </article>
-          <article className="panel">
-            <p className="eyebrow">Mekanikere</p>
-            <h2>Konfigureret</h2>
-            <p className="metric">{mechanics.length}</p>
-            <p className="muted">Administreres under Indstillinger.</p>
-          </article>
-          <article className="panel">
-            <p className="eyebrow">Seneste sync</p>
-            <h2>Status</h2>
-            <p className="metric">{dashboard.latestSync?.status ?? "ingen"}</p>
-            <p className="muted">{latestSyncLabel}</p>
-          </article>
-        </section>
-
-        {loadError ? (
-          <section className="panel panel--warning" style={{ marginBottom: 24 }}>
-            <p className="eyebrow">Opsætning</p>
-            <h2>Data er ikke klar endnu</h2>
-            <p className="muted">{loadError}</p>
-          </section>
-        ) : null}
-
-        <section className="panel-grid panel-grid--features">
-          <section className="panel panel--link">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">TV-visning</p>
-                <h2>Fullscreen bar chart</h2>
-              </div>
+          {result && (
+            <div className={`response-box${result.error ? " response-box--error" : ""}`}>
+              <p className="response-box__label">{result.error ? "Fejl" : "Resultat"}</p>
+              <pre>
+                {result.error
+                  ? result.error
+                  : JSON.stringify(
+                      {
+                        dato: result.syncDate,
+                        opgaver_hentet: result.ticketsFetched,
+                        materialer_behandlet: result.materialsProcessed,
+                        tid: `${((result.durationMs ?? 0) / 1000).toFixed(1)}s`,
+                        kvarterer_pr_mekaniker: result.mechanicTotals,
+                      },
+                      null,
+                      2,
+                    )}
+              </pre>
             </div>
-            <p className="muted">Store søjler pr. mekaniker, 8 timers mållinje og sidst opdateret.</p>
-            <p className="inline-links">
-              <Link href="/dashboard" rel="noreferrer" target="_blank">
-                Åbn TV-visning
+          )}
+        </div>
+
+        {/* Quick links */}
+        <div className="panel">
+          <p className="eyebrow">Genveje</p>
+          <h2>Sider</h2>
+          <div className="status-list">
+            <div className="status-item">
+              <div className="status-item__label">
+                <strong>TV-dashboard</strong>
+                <p className="muted" style={{ fontSize: "0.85rem" }}>Roterer: i går → aktuel uge → aktuel måned</p>
+              </div>
+              <Link href="/dashboard" target="_blank" className="button button--ghost" style={{ fontSize: "0.85rem", padding: "8px 14px" }}>
+                Åbn ↗
               </Link>
-            </p>
-          </section>
-
-          <section className="panel panel--link">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Rapporter</p>
-                <h2>Tabel og CSV</h2>
-              </div>
             </div>
-            <p className="muted">Dagligt, ugentligt snit, månedligt snit, summeret eller detaljeret.</p>
-            <p className="inline-links">
-              <Link href="/reports">Åbn rapporter</Link>
-            </p>
-          </section>
-
-          <section className="panel panel--link">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Indstillinger</p>
-                <h2>Mekanikere og mål</h2>
+            <div className="status-item">
+              <div className="status-item__label">
+                <strong>Rapporter</strong>
+                <p className="muted" style={{ fontSize: "0.85rem" }}>Kvarterer pr. mekaniker for alle 3 perioder</p>
               </div>
+              <Link href="/reports" className="button button--ghost" style={{ fontSize: "0.85rem", padding: "8px 14px" }}>
+                Åbn
+              </Link>
             </div>
-            <p className="muted">Tilføj mekanikere, varenummer og dagligt mål direkte i appen.</p>
-            <p className="inline-links">
-              <Link href="/settings">Åbn indstillinger</Link>
-            </p>
-          </section>
-        </section>
-
-        <InternalActions disabledReason={syncReadinessMessage} syncReady={env.syncReady} />
-
-        <section className="panel panel--status admin-grid">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Miljø</p>
-              <h2>Driftsklar status</h2>
+            <div className="status-item">
+              <div className="status-item__label">
+                <strong>Indstillinger</strong>
+                <p className="muted" style={{ fontSize: "0.85rem" }}>Mekanikere, varenumre og dagligt mål</p>
+              </div>
+              <Link href="/settings" className="button button--ghost" style={{ fontSize: "0.85rem", padding: "8px 14px" }}>
+                Åbn
+              </Link>
             </div>
           </div>
-          <div className="status-groups">
-            {groups.map((group) => (
-              <section className="status-group" key={group.title}>
-                <div className="status-group__header">
-                  <div>
-                    <h3 className="status-group__title">{group.title}</h3>
-                    <p className="muted status-note">{group.summary}</p>
-                  </div>
-                  <span className={`pill ${group.ready ? "pill--ok" : "pill--missing"}`}>
-                    {group.ready ? "Klar" : "Mangler"}
-                  </span>
-                </div>
-                <div className="status-list">
-                  {group.rows.map((row) => (
-                    <div className="status-item" key={row.label}>
-                      <span className="status-item__label">{row.label}</span>
-                      <span className={`pill ${row.present ? "pill--ok" : "pill--missing"}`}>
-                        {row.present ? "Til stede" : "Mangler"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
+        </div>
+
+        {/* Scheduler info */}
+        <div className="panel">
+          <p className="eyebrow">Automatisk sync</p>
+          <h2>Scheduler</h2>
+          <p className="muted">
+            Supabase pg_cron kører automatisk en sync kl. <strong>16:00</strong> (dansk sommertid) hver dag.
+            Se <code>supabase/admin/setup_supabase_cron.sql.example</code> for opsætning.
+          </p>
+          <div className="status-list">
+            <div className="status-item">
+              <span>Kørselstidspunkt</span>
+              <span className="pill pill--ok">16:00 dagligt</span>
+            </div>
+            <div className="status-item">
+              <span>Endpoint</span>
+              <code style={{ fontSize: "0.8rem", color: "var(--muted)" }}>/api/cron/sync</code>
+            </div>
           </div>
-        </section>
-      </main>
-    </>
+        </div>
+      </div>
+    </main>
   );
 }

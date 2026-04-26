@@ -1,279 +1,239 @@
-import Link from "next/link";
+"use client";
 
-import { AppHeader } from "@/components/app-header";
-import { CalendarYearOverview } from "@/app/(authenticated)/reports/calendar-year-overview";
-import { FilterBar } from "@/app/(authenticated)/reports/filter-bar";
-import { KpiRow } from "@/app/(authenticated)/reports/kpi-row";
-import { SummaryTable } from "@/app/(authenticated)/reports/summary-table";
-import {
-  getActiveMechanics,
-  getAdminSummary,
-  getCalendarYearOverview,
-  getKpiSnapshot,
-  type AdminFilters,
-  type PeriodMode,
-  type SortDirection,
-} from "@/lib/data/reports";
-import { getDashboardReadinessMessage, getEnvPresence, toOperatorErrorMessage } from "@/lib/env";
-import { getCopenhagenDateString } from "@/lib/time";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-type SearchParamsValue = string | string[] | undefined;
-
-type ReportsSearchParams = Record<string, SearchParamsValue>;
-
-type ReportsPageFilters = {
-  dir: SortDirection;
-  fromDate: string;
-  mechanicIds: string[];
-  periodMode: PeriodMode;
-  q: string;
-  sort: string;
-  toDate: string;
+type PeriodTotals = {
+  mechanic_id: string;
+  quarters: number;
 };
 
-const SUMMARY_SORTS = new Set(["mechanic", "quarters", "hours", "target", "variance", "pct", "tickets", "avgDay", "avgTicket"]);
+type Mechanic = {
+  id: string;
+  name: string;
+  sku: string;
+  display_order: number;
+  active: boolean;
+  daily_target_quarters: number;
+};
 
-function readFirstParam(value: SearchParamsValue): string | undefined {
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-
-  return typeof value === "string" ? value : undefined;
-}
-
-function readManyParams(value: SearchParamsValue): string[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  return typeof value === "string" ? [value] : [];
-}
-
-function parseMechanicIds(params: ReportsSearchParams): string[] {
-  const repeated = readManyParams(params.mechanicIds);
-  const fallback = readFirstParam(params.mechanicId);
-  const rawValues = repeated.length > 0 ? repeated : fallback ? [fallback] : [];
-
-  return [...new Set(rawValues.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean))];
-}
-
-function getDefaultDirection(sort: string): SortDirection {
-  return sort === "mechanic" ? "asc" : "desc";
-}
-
-function parseFilters(params: ReportsSearchParams): ReportsPageFilters {
-  const today = getCopenhagenDateString();
-  const fromDate = readFirstParam(params.fromDate) ?? today;
-  const toDate = readFirstParam(params.toDate) ?? today;
-  const periodModeValue = readFirstParam(params.periodMode);
-  const periodMode: PeriodMode =
-    periodModeValue === "weekly_avg" || periodModeValue === "monthly_avg" || periodModeValue === "daily"
-      ? periodModeValue
-      : "daily";
-  const mechanicIds = parseMechanicIds(params);
-  const q = readFirstParam(params.q)?.trim() ?? "";
-  const sortValue = readFirstParam(params.sort);
-  const sort = sortValue && SUMMARY_SORTS.has(sortValue) ? sortValue : "hours";
-  const dirValue = readFirstParam(params.dir);
-  const dir = dirValue === "asc" || dirValue === "desc" ? dirValue : getDefaultDirection(sort);
-
-  return {
-    dir,
-    fromDate,
-    mechanicIds,
-    periodMode,
-    q,
-    sort,
-    toDate,
+type ReportsData = {
+  yesterday: PeriodTotals[];
+  current_week: PeriodTotals[];
+  current_month: PeriodTotals[];
+  lastSyncAt: string | null;
+  mechanics: Mechanic[];
+  periods: {
+    yesterday: string;
+    weekStart: string;
+    monthStart: string;
   };
+};
+
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${parseInt(d)}/${parseInt(m)}/${y}`;
 }
 
-function buildReportsHref(filters: ReportsPageFilters, overrides: Partial<ReportsPageFilters> = {}) {
-  const next = {
-    ...filters,
-    ...overrides,
-  };
-  const params = new URLSearchParams({
-    fromDate: next.fromDate,
-    toDate: next.toDate,
-    periodMode: next.periodMode,
-    sort: next.sort,
-    dir: next.dir,
+function formatTime(iso: string | null): string {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  return d.toLocaleString("da-DK", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
   });
-
-  if (next.mechanicIds.length > 0) {
-    params.set("mechanicIds", next.mechanicIds.join(","));
-  }
-
-  if (next.q) {
-    params.set("q", next.q);
-  }
-
-  return `/reports?${params.toString()}`;
 }
 
-function buildExportHref(filters: ReportsPageFilters, overrides: Partial<ReportsPageFilters> = {}) {
-  const next = {
-    ...filters,
-    ...overrides,
-  };
-  const params = new URLSearchParams({
-    fromDate: next.fromDate,
-    toDate: next.toDate,
-    periodMode: next.periodMode,
-    sort: next.sort,
-    dir: next.dir,
-  });
-
-  if (next.mechanicIds.length > 0) {
-    params.set("mechanicIds", next.mechanicIds.join(","));
+function countWorkDays(from: string, to: string): number {
+  let days = 0;
+  const cur = new Date(from);
+  const end = new Date(to);
+  while (cur <= end) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) days++;
+    cur.setDate(cur.getDate() + 1);
   }
-
-  if (next.q) {
-    params.set("q", next.q);
-  }
-
-  return `/api/reports/export?${params.toString()}`;
+  return Math.max(days, 1);
 }
 
-function getQuickPresets() {
-  const today = getCopenhagenDateString();
-  const current = new Date(`${today}T12:00:00Z`);
-  const yesterday = new Date(current);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-
-  const monday = new Date(current);
-  const day = (monday.getUTCDay() + 6) % 7;
-  monday.setUTCDate(monday.getUTCDate() - day);
-
-  const sunday = new Date(monday);
-  sunday.setUTCDate(sunday.getUTCDate() + 6);
-
-  const lastWeekStart = new Date(monday);
-  lastWeekStart.setUTCDate(lastWeekStart.getUTCDate() - 7);
-
-  const lastWeekEnd = new Date(monday);
-  lastWeekEnd.setUTCDate(lastWeekEnd.getUTCDate() - 1);
-
-  const firstOfMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 1));
-  const lastOfMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0));
-  const firstOfPreviousMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - 1, 1));
-  const lastOfPreviousMonth = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 0));
-
-  const lastThirtyStart = new Date(current);
-  lastThirtyStart.setUTCDate(lastThirtyStart.getUTCDate() - 29);
-
-  const toIsoDate = (value: Date) => value.toISOString().slice(0, 10);
-
-  return [
-    { label: "I går", from: toIsoDate(yesterday), to: toIsoDate(yesterday) },
-    { label: "Aktuel uge (man–i går)", from: toIsoDate(monday), to: toIsoDate(yesterday) },
-    { label: "Aktuel måned (1.–i går)", from: toIsoDate(firstOfMonth), to: toIsoDate(yesterday) },
-    { label: "I dag", from: today, to: today },
-    { label: "Denne uge", from: toIsoDate(monday), to: toIsoDate(sunday) },
-    { label: "Sidste uge", from: toIsoDate(lastWeekStart), to: toIsoDate(lastWeekEnd) },
-    { label: "Denne måned", from: toIsoDate(firstOfMonth), to: toIsoDate(lastOfMonth) },
-    { label: "Sidste måned", from: toIsoDate(firstOfPreviousMonth), to: toIsoDate(lastOfPreviousMonth) },
-    { label: "Sidste 30 dage", from: toIsoDate(lastThirtyStart), to: today },
-  ];
-}
-
-function toAdminFilters(filters: ReportsPageFilters): AdminFilters {
-  return {
-    dir: filters.dir,
-    fromDate: filters.fromDate,
-    mechanicIds: filters.mechanicIds,
-    periodMode: filters.periodMode,
-    q: filters.q,
-    sort: filters.sort,
-    toDate: filters.toDate,
-  };
-}
-
-export default async function ReportsPage({
-  searchParams,
+function PeriodTable({
+  title,
+  subtitle,
+  mechanics,
+  totals,
+  targetDays,
 }: {
-  searchParams: Promise<ReportsSearchParams>;
+  title: string;
+  subtitle: string;
+  mechanics: Mechanic[];
+  totals: PeriodTotals[];
+  targetDays: number;
 }) {
-  const env = getEnvPresence();
+  const totalsMap = new Map(totals.map((t) => [t.mechanic_id, t.quarters]));
+  const grandTotal = mechanics.reduce((s, m) => s + (totalsMap.get(m.id) ?? 0), 0);
+  const grandTarget = mechanics.reduce((s, m) => s + m.daily_target_quarters * targetDays, 0);
 
-  if (!env.dashboardReady) {
-    return (
-      <>
-        <AppHeader activeHref="/reports" />
-        <main className="page-shell">
-          <section className="panel">
-            <p className="eyebrow">Rapport utilgængelig</p>
-            <h2>Serverdata er ikke klar</h2>
-            <p className="muted">{getDashboardReadinessMessage(env) ?? "Supabase er ikke konfigureret korrekt."}</p>
-            <p className="inline-links">
-              <Link href="/">Tilbage til kontrolpanel</Link>
+  return (
+    <div className="panel" style={{ marginBottom: "24px" }}>
+      <div>
+        <p className="eyebrow">{title}</p>
+        <p className="muted" style={{ fontSize: "0.9rem", margin: "4px 0 0" }}>{subtitle}</p>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Mekaniker</th>
+              <th className="num">Kvarterer</th>
+              <th className="num">Timer</th>
+              <th className="num">Mål</th>
+              <th className="num">Opfyldelse</th>
+              <th style={{ width: "120px" }}>Fremgang</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mechanics.map((m) => {
+              const quarters = totalsMap.get(m.id) ?? 0;
+              const hours = (quarters * 15) / 60;
+              const target = m.daily_target_quarters * targetDays;
+              const pct = target > 0 ? quarters / target : 0;
+              const pctLabel = target > 0 ? `${Math.round(pct * 100)}%` : "–";
+              const pctCapped = Math.min(pct, 1);
+
+              return (
+                <tr key={m.id}>
+                  <td><strong>{m.name}</strong></td>
+                  <td className="num">{quarters}</td>
+                  <td className="num">{hours.toFixed(1)}</td>
+                  <td className="num">{target > 0 ? target : "–"}</td>
+                  <td className="num"
+                    style={{ color: pct >= 1 ? "#059669" : pct >= 0.7 ? "#d97706" : "#dc2626", fontWeight: 700 }}>
+                    {pctLabel}
+                  </td>
+                  <td>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-bar__fill"
+                        style={{
+                          width: `${pctCapped * 100}%`,
+                          background: pct >= 1 ? "#10b981" : pct >= 0.7 ? "#f59e0b" : "#ef4444",
+                        }}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: "2px solid var(--line)" }}>
+              <td><strong>Total</strong></td>
+              <td className="num"><strong>{grandTotal}</strong></td>
+              <td className="num"><strong>{((grandTotal * 15) / 60).toFixed(1)}</strong></td>
+              <td className="num"><strong>{grandTarget || "–"}</strong></td>
+              <td className="num">
+                <strong style={{ color: grandTarget > 0 && grandTotal >= grandTarget ? "#059669" : undefined }}>
+                  {grandTarget > 0 ? `${Math.round((grandTotal / grandTarget) * 100)}%` : "–"}
+                </strong>
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default function ReportsPage() {
+  const [data, setData] = useState<ReportsData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/data", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as ReportsData;
+      setData(json);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fejl");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+
+  const activeMechanics = (data?.mechanics ?? [])
+    .filter((m) => m.active)
+    .sort((a, b) => a.display_order - b.display_order);
+
+  const weekDays = data ? countWorkDays(data.periods.weekStart, data.periods.yesterday) : 5;
+  const monthDays = data ? countWorkDays(data.periods.monthStart, data.periods.yesterday) : 22;
+
+  return (
+    <main className="page-shell">
+      <div className="hero">
+        <div className="hero__top">
+          <div>
+            <p className="eyebrow">B-Bikes</p>
+            <h1>Rapporter</h1>
+          </div>
+          {data?.lastSyncAt && (
+            <p className="muted" style={{ fontSize: "0.85rem", alignSelf: "flex-end" }}>
+              Sidst synkroniseret {formatTime(data.lastSyncAt)}
             </p>
-          </section>
-        </main>
-      </>
-    );
-  }
+          )}
+        </div>
+      </div>
 
-  const filters = parseFilters(await searchParams);
-  const presets = getQuickPresets().map((preset) => ({
-    active: filters.fromDate === preset.from && filters.toDate === preset.to,
-    href: buildReportsHref(filters, {
-      fromDate: preset.from,
-      toDate: preset.to,
-    }),
-    label: preset.label,
-  }));
-  const exportHref = buildExportHref(filters);
+      <nav className="nav">
+        <Link href="/" className="nav__link">Kontrolpanel</Link>
+        <span className="nav__link nav__link--active">Rapporter</span>
+        <Link href="/settings" className="nav__link">Indstillinger</Link>
+        <Link href="/dashboard" className="nav__link" target="_blank">TV-dashboard ↗</Link>
+      </nav>
 
-  try {
-    const adminFilters = toAdminFilters(filters);
-    const calendarYear = Number.parseInt(getCopenhagenDateString().slice(0, 4), 10);
-    const [mechanics, kpis, rows, calendarYearRows] = await Promise.all([
-      getActiveMechanics(),
-      getKpiSnapshot(adminFilters),
-      getAdminSummary(adminFilters),
-      getCalendarYearOverview({ mechanicIds: adminFilters.mechanicIds }, calendarYear),
-    ]);
+      {loading && <p className="muted">Indlæser…</p>}
 
-    return (
-      <>
-        <AppHeader activeHref="/reports" />
-        <main className="page-shell">
-          <section className="hero">
-            <div className="hero__top">
-              <div>
-                <p className="eyebrow">Rapportering</p>
-                <h1>Admin-panel for værkstedsdata</h1>
-              </div>
-            </div>
-            <p>Filtrér historik, gennemse performance pr. mekaniker og eksportér CSV uden at røre TV-dashboardet.</p>
-          </section>
+      {error && (
+        <div className="response-box response-box--error" style={{ marginBottom: "24px" }}>
+          <p className="response-box__label">Fejl</p>
+          <pre>{error}</pre>
+        </div>
+      )}
 
-          <FilterBar exportHref={exportHref} filters={filters} mechanics={mechanics} presets={presets} resetHref="/reports" />
-          <KpiRow kpis={kpis} />
-          <SummaryTable filters={filters} rows={rows} />
-          <CalendarYearOverview rows={calendarYearRows} year={calendarYear} />
-        </main>
-      </>
-    );
-  } catch (error) {
-    return (
-      <>
-        <AppHeader activeHref="/reports" />
-        <main className="page-shell">
-          <section className="panel">
-            <p className="eyebrow">Rapport utilgængelig</p>
-            <h2>Kunne ikke hente rapportdata</h2>
-            <p className="muted">{toOperatorErrorMessage(error)}</p>
-            <p className="inline-links">
-              <Link href="/">Tilbage til kontrolpanel</Link>
-            </p>
-          </section>
-        </main>
-      </>
-    );
-  }
+      {data && (
+        <>
+          <PeriodTable
+            title="I går"
+            subtitle={formatDate(data.periods.yesterday)}
+            mechanics={activeMechanics}
+            totals={data.yesterday}
+            targetDays={1}
+          />
+          <PeriodTable
+            title="Aktuel uge"
+            subtitle={`${formatDate(data.periods.weekStart)} – ${formatDate(data.periods.yesterday)} · ${weekDays} arbejdsdage`}
+            mechanics={activeMechanics}
+            totals={data.current_week}
+            targetDays={weekDays}
+          />
+          <PeriodTable
+            title="Aktuel måned"
+            subtitle={`${formatDate(data.periods.monthStart)} – ${formatDate(data.periods.yesterday)} · ${monthDays} arbejdsdage`}
+            mechanics={activeMechanics}
+            totals={data.current_month}
+            targetDays={monthDays}
+          />
+        </>
+      )}
+    </main>
+  );
 }

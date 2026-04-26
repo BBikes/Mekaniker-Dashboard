@@ -1,79 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-
-import {
-  aggregateScheduledMetrics,
-  completeScheduledSyncRun,
-  runPhaseOneSync,
-  startScheduledSyncRun,
-} from "@/lib/sync/run-phase-one-sync";
+import { NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/supabase/server-auth";
+import { getMechanics } from "@/lib/data/mechanics";
+import { runDailySync } from "@/lib/sync/bikedesk";
+import { saveSyncResult, logSyncStart, logSyncComplete, logSyncError } from "@/lib/sync/save";
 
-export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 minutes
 
-async function handleScheduledSync(request: NextRequest) {
+async function handleSync(request: Request) {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Ikke autoriseret." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const scheduledRun = await startScheduledSyncRun();
-
-  if (scheduledRun.skipped) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: "another_sync_is_running",
-      runningSyncLogId: scheduledRun.runningSyncLogId,
-      runningSyncType: scheduledRun.runningSyncType,
-      startedAt: scheduledRun.startedAt,
-      lockWindowMinutes: scheduledRun.lockWindowMinutes,
-    });
-  }
+  const logId = await logSyncStart();
 
   try {
-    const baseline = await runPhaseOneSync("baseline");
-    const sync = await runPhaseOneSync("sync", {
-      materialLookbackHours: 48,
-      useFilteredProductDiscovery: true,
-    });
-    const metrics = aggregateScheduledMetrics([baseline, sync]);
+    const mechanics = await getMechanics(true);
 
-    await completeScheduledSyncRun(scheduledRun.syncLogId, {
-      status: "completed",
-      message: "scheduled sync completed",
-      metrics,
-      details: {
-        baselineSyncLogId: baseline.syncLogId,
-        syncSyncLogId: sync.syncLogId,
-      },
-    });
+    if (mechanics.length === 0) {
+      await logSyncError(logId, new Error("No active mechanics configured"));
+      return NextResponse.json({ error: "No active mechanics configured" }, { status: 400 });
+    }
+
+    const result = await runDailySync(mechanics);
+    await saveSyncResult(result);
+    await logSyncComplete(logId, result);
 
     return NextResponse.json({
       ok: true,
-      skipped: false,
-      scheduledSyncLogId: scheduledRun.syncLogId,
-      baseline,
-      sync,
+      syncDate: result.syncDate,
+      ticketsFetched: result.ticketsFetched,
+      materialsProcessed: result.materialsProcessed,
+      mechanicTotals: result.mechanicTotals,
+      durationMs: result.durationMs,
     });
-  } catch (error) {
-    await completeScheduledSyncRun(scheduledRun.syncLogId, {
-      status: "failed",
-      message: error instanceof Error ? error.message : "Ukendt scheduled sync-fejl",
-      details: {},
-    });
-
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Ukendt scheduled sync-fejl",
-      },
-      { status: 500 },
-    );
+  } catch (err) {
+    await logSyncError(logId, err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-export async function GET(request: NextRequest) {
-  return handleScheduledSync(request);
+export async function GET(request: Request) {
+  return handleSync(request);
 }
 
-export async function POST(request: NextRequest) {
-  return handleScheduledSync(request);
+export async function POST(request: Request) {
+  return handleSync(request);
 }

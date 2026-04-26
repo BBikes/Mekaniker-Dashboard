@@ -1,57 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/supabase/server-auth";
+import { getMechanics } from "@/lib/data/mechanics";
+import { runDailySync } from "@/lib/sync/bikedesk";
+import { saveSyncResult, logSyncStart, logSyncComplete, logSyncError } from "@/lib/sync/save";
 
-import { toOperatorErrorMessage } from "@/lib/env";
-import { runPhaseOneSync, type SyncMode } from "@/lib/sync/run-phase-one-sync";
-import { createUnauthorizedApiResponse, getCurrentUserOrNull } from "@/lib/supabase/server-auth";
-
-export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-type RequestPayload = {
-  mode?: SyncMode;
-  days?: number;
-};
-
-export async function POST(request: NextRequest) {
-  const user = await getCurrentUserOrNull();
+export async function POST() {
+  const user = await getCurrentUser();
   if (!user) {
-    return createUnauthorizedApiResponse();
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const payload = (await request.json()) as RequestPayload;
-    const mode: SyncMode =
-      payload.mode === "baseline"
-        ? "baseline"
-        : payload.mode === "payments_backfill"
-          ? "payments_backfill"
-          : "sync";
-    const days =
-      typeof payload.days === "number" && Number.isFinite(payload.days)
-        ? Math.max(1, Math.trunc(payload.days))
-        : undefined;
-    const paymentBackfillDays = mode === "payments_backfill" ? (days ?? 7) : days;
-    const syncOptions =
-      mode === "sync"
-        ? {
-            skipCykelPlusSync: true,
-            skipPaymentSync: true,
-            useFilteredProductDiscovery: true,
-            materialLookbackHours: 48,
-          }
-        : {};
-    const result = await runPhaseOneSync(mode, {
-      paymentBackfillDays,
-      ...syncOptions,
-    });
+  const logId = await logSyncStart();
 
-    return NextResponse.json({ result });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: toOperatorErrorMessage(error, "Ukendt sync-fejl."),
-      },
-      { status: 500 },
-    );
+  try {
+    const mechanics = await getMechanics(true);
+
+    if (mechanics.length === 0) {
+      await logSyncError(logId, new Error("No active mechanics configured"));
+      return NextResponse.json({ error: "No active mechanics configured" }, { status: 400 });
+    }
+
+    const result = await runDailySync(mechanics);
+    await saveSyncResult(result);
+    await logSyncComplete(logId, result);
+
+    return NextResponse.json({
+      ok: true,
+      syncDate: result.syncDate,
+      ticketsFetched: result.ticketsFetched,
+      materialsProcessed: result.materialsProcessed,
+      mechanicTotals: result.mechanicTotals,
+      durationMs: result.durationMs,
+    });
+  } catch (err) {
+    await logSyncError(logId, err);
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
